@@ -129,6 +129,7 @@ export interface KPIData {
   averageComfortScore: number;
   openIssuesCount: number;
   predictedPeakDemandTime: Date;
+  demandTrend: 'increasing' | 'decreasing' | 'low';
 }
 
 export interface TimeSeriesPoint {

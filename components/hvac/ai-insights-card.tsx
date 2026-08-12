@@ -28,13 +28,8 @@ export function AIInsightsCard() {
   const preCoolStart = peakHour - 2;
   const preCoolWindow = `${String(preCoolStart).padStart(2, '0')}:00 - ${String(peakHour).padStart(2, '0')}:00`;
 
-  // Forecast next hour
-  const currentHour = new Date().getHours();
-  const nextHourDemand = currentHour >= 8 && currentHour < 16 
-    ? 'increasing' 
-    : currentHour >= 16 && currentHour < 20 
-    ? 'decreasing' 
-    : 'low';
+  // Demand trend: from the backend's 30-min-ahead predictions vs current draw
+  const nextHourDemand = kpis.demandTrend;
 
   return (
     <Card className={cn(

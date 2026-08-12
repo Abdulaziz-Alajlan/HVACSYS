@@ -54,3 +54,18 @@ class PredictionOut(BaseModel):
     predicted_cooling_demand: float
     confidence: float
     model_version: str
+
+
+class RecommendationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    zone_id: int
+    timestamp: datetime
+    action: str
+    current_airflow: float
+    recommended_airflow: float
+    reason: str
+    estimated_energy_change: float
+    comfort_impact: str | None
+    status: str

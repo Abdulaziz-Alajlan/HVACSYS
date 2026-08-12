@@ -44,7 +44,7 @@ function generateTimeSeriesHistory(hours: number, baseValue: number, variance: n
 }
 
 // Generate cooling units
-function generateCoolingUnits(): CoolingUnit[] {
+export function generateCoolingUnits(): CoolingUnit[] {
   const types: CoolingUnit['type'][] = ['AHU', 'FCU', 'Chiller', 'Split'];
   const units: CoolingUnit[] = [];
   
@@ -95,7 +95,7 @@ function generateCoolingUnits(): CoolingUnit[] {
 }
 
 // Generate dampers
-function generateDampers(coolingUnits: CoolingUnit[]): Damper[] {
+export function generateDampers(coolingUnits: CoolingUnit[]): Damper[] {
   const dampers: Damper[] = [];
   
   const damperConfigs = [
@@ -255,7 +255,7 @@ function generateRooms(dampers: Damper[]): Room[] {
 }
 
 // Generate schedules
-function generateSchedules(rooms: Room[]): Schedule[] {
+export function generateSchedules(rooms: Room[]): Schedule[] {
   const schedules: Schedule[] = [];
   const now = new Date();
   
@@ -291,7 +291,7 @@ function generateSchedules(rooms: Room[]): Schedule[] {
 }
 
 // Generate issues
-function generateIssues(coolingUnits: CoolingUnit[], dampers: Damper[], rooms: Room[]): Issue[] {
+export function generateIssues(coolingUnits: CoolingUnit[], dampers: Damper[], rooms: Room[]): Issue[] {
   const issues: Issue[] = [];
   const now = new Date();
   
@@ -381,7 +381,7 @@ function generateIssues(coolingUnits: CoolingUnit[], dampers: Damper[], rooms: R
 }
 
 // Generate maintenance events
-function generateMaintenanceEvents(coolingUnits: CoolingUnit[]): MaintenanceEvent[] {
+export function generateMaintenanceEvents(coolingUnits: CoolingUnit[]): MaintenanceEvent[] {
   const events: MaintenanceEvent[] = [];
   const now = new Date();
   
@@ -416,7 +416,7 @@ function generateMaintenanceEvents(coolingUnits: CoolingUnit[]): MaintenanceEven
 }
 
 // Generate AI recommendations
-function generateRecommendations(rooms: Room[], dampers: Damper[], coolingUnits: CoolingUnit[]): Recommendation[] {
+export function generateRecommendations(rooms: Room[], dampers: Damper[], coolingUnits: CoolingUnit[]): Recommendation[] {
   const recommendations: Recommendation[] = [];
   const now = new Date();
   
@@ -500,28 +500,36 @@ function generateRecommendations(rooms: Room[], dampers: Damper[], coolingUnits:
   return recommendations;
 }
 
-// Calculate KPIs
-function calculateKPIs(rooms: Room[], coolingUnits: CoolingUnit[], issues: Issue[]): KPIData {
+// Calculate KPIs. `previous` carries forward fields that a live data refresh
+// (see hvac-store.ts) computed from real backend data, so a mock simulation
+// tick doesn't overwrite them with fresh random numbers.
+function calculateKPIs(
+  rooms: Room[],
+  coolingUnits: CoolingUnit[],
+  issues: Issue[],
+  previous?: Pick<KPIData, 'estimatedEnergySavings' | 'predictedPeakDemandTime' | 'demandTrend'>
+): KPIData {
   const activeRooms = rooms.filter(r => r.coolingStatus !== 'Inactive Cooling');
   const avgComfort = rooms.reduce((sum, r) => sum + r.comfortScore, 0) / rooms.length;
   const totalLoad = coolingUnits.reduce((sum, u) => sum + u.load, 0) / coolingUnits.length;
-  
+
   const peakTime = new Date();
   peakTime.setHours(14, 0, 0, 0);
-  
+
   return {
     totalActiveRooms: activeRooms.length,
     totalRooms: rooms.length,
     coolingLoadPercentage: Math.round(totalLoad),
-    estimatedEnergySavings: Math.round(rand(45, 85)),
+    estimatedEnergySavings: previous?.estimatedEnergySavings ?? Math.round(rand(45, 85)),
     averageComfortScore: Math.round(avgComfort),
     openIssuesCount: issues.filter(i => i.status === 'open').length,
-    predictedPeakDemandTime: peakTime,
+    predictedPeakDemandTime: previous?.predictedPeakDemandTime ?? peakTime,
+    demandTrend: previous?.demandTrend ?? 'low',
   };
 }
 
 // Generate utilization history
-function generateUtilizationHistory(): TimeSeriesPoint[] {
+export function generateUtilizationHistory(): TimeSeriesPoint[] {
   const now = new Date();
   const points: TimeSeriesPoint[] = [];
   
@@ -621,7 +629,7 @@ export function simulateUpdate(state: HVACSystemState): HVACSystemState {
   }
   
   // Recalculate KPIs
-  newState.kpis = calculateKPIs(newState.rooms, newState.coolingUnits, newState.issues);
+  newState.kpis = calculateKPIs(newState.rooms, newState.coolingUnits, newState.issues, state.kpis);
   newState.lastUpdated = new Date();
   
   return newState;

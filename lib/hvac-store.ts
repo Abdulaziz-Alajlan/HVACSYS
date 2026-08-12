@@ -2,12 +2,76 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { HVACSystemState, Schedule, Room, CoolingUnit, Damper } from './hvac-types';
-import { generateInitialHVACState, simulateUpdate } from './hvac-mock-data';
+import type { HVACSystemState, KPIData, Schedule, Room, CoolingUnit, Damper } from './hvac-types';
+import {
+  generateInitialHVACState,
+  simulateUpdate,
+  generateCoolingUnits,
+  generateDampers,
+  generateSchedules,
+  generateIssues,
+  generateMaintenanceEvents,
+  generateRecommendations,
+  generateUtilizationHistory,
+} from './hvac-mock-data';
+import { fetchLiveZoneBundles, bundleToRoom, computeDemandInsights } from './hvac-live-data';
+
+// Builds a full dashboard state from real backend data: rooms come from
+// live zones/readings/predictions/recommendations; cooling units, dampers,
+// schedules, issues, and maintenance events have no backend model yet, so
+// they're still mock-generated, but issues/schedules/recommendations are
+// derived FROM the real rooms (those generators already take rooms as
+// input), so they stay consistent with the real numbers shown elsewhere.
+async function buildLiveState(): Promise<HVACSystemState> {
+  const bundles = await fetchLiveZoneBundles();
+  if (bundles.length === 0) {
+    throw new Error('Backend returned no zone data');
+  }
+
+  const rooms = bundles.map(bundleToRoom);
+  const coolingUnits = generateCoolingUnits();
+  const dampers = generateDampers(coolingUnits);
+  const schedules = generateSchedules(rooms);
+  const issues = generateIssues(coolingUnits, dampers, rooms);
+  const maintenanceEvents = generateMaintenanceEvents(coolingUnits);
+  const recommendations = generateRecommendations(rooms, dampers, coolingUnits);
+  const utilizationHistory = generateUtilizationHistory();
+  const insights = computeDemandInsights(bundles);
+
+  const activeRooms = rooms.filter((r) => r.coolingStatus !== 'Inactive Cooling');
+  const avgComfort = rooms.reduce((sum, r) => sum + r.comfortScore, 0) / (rooms.length || 1);
+  const totalLoad = coolingUnits.reduce((sum, u) => sum + u.load, 0) / (coolingUnits.length || 1);
+
+  const kpis: KPIData = {
+    totalActiveRooms: activeRooms.length,
+    totalRooms: rooms.length,
+    coolingLoadPercentage: Math.round(totalLoad),
+    estimatedEnergySavings: insights.energySavingsKwh,
+    averageComfortScore: Math.round(avgComfort),
+    openIssuesCount: issues.filter((i) => i.status === 'open').length,
+    predictedPeakDemandTime: insights.peakDemandTime,
+    demandTrend: insights.demandTrend,
+  };
+
+  return {
+    coolingUnits,
+    dampers,
+    rooms,
+    schedules,
+    issues,
+    maintenanceEvents,
+    recommendations,
+    kpis,
+    utilizationHistory,
+    lastUpdated: new Date(),
+    aiOptimizationActive: true,
+    simulationRunning: false,
+  };
+}
 
 interface HVACStore extends HVACSystemState {
   // Actions
-  initialize: () => void;
+  initialize: () => Promise<void>;
   toggleAIOptimization: () => void;
   toggleSimulation: () => void;
   runSimulationTick: () => void;
@@ -19,7 +83,7 @@ interface HVACStore extends HVACSystemState {
   acknowledgeIssue: (id: string) => void;
   resolveIssue: (id: string) => void;
   setTimeRange: (range: '1h' | '24h' | '7d') => void;
-  refreshData: () => void;
+  refreshData: () => Promise<void>;
   
   // UI State
   selectedRoomId: string | null;
@@ -33,6 +97,14 @@ interface HVACStore extends HVACSystemState {
   setSelectedDamper: (id: string | null) => void;
   setHighlightedRoom: (id: string | null) => void;
 }
+
+// Guards initialize()/refreshData() against out-of-order responses: if a
+// newer live-data fetch starts before an older one resolves (e.g. the user
+// clicks Refresh twice, or a click races the mount-time initialize() call),
+// only the result of the most recently started fetch is applied. Same
+// version-counter pattern zustand's own persist middleware uses to guard
+// concurrent rehydrate() calls.
+let liveFetchVersion = 0;
 
 export const useHVACStore = create<HVACStore>()(
   persist(
@@ -53,6 +125,7 @@ export const useHVACStore = create<HVACStore>()(
         averageComfortScore: 0,
         openIssuesCount: 0,
         predictedPeakDemandTime: new Date(),
+        demandTrend: 'low',
       },
       utilizationHistory: [],
       lastUpdated: new Date(),
@@ -67,12 +140,19 @@ export const useHVACStore = create<HVACStore>()(
       highlightedRoomId: null,
       
       // Actions
-      initialize: () => {
+      initialize: async () => {
         const state = get();
         // Only initialize if not already loaded
-        if (state.rooms.length === 0) {
-          const initialState = generateInitialHVACState();
-          set(initialState);
+        if (state.rooms.length > 0) return;
+        const version = ++liveFetchVersion;
+        try {
+          const liveState = await buildLiveState();
+          if (version !== liveFetchVersion) return; // superseded by a newer fetch
+          set({ ...liveState, aiOptimizationActive: get().aiOptimizationActive });
+        } catch (err) {
+          if (version !== liveFetchVersion) return;
+          console.error('Failed to load live backend data, falling back to mock data:', err);
+          set(generateInitialHVACState());
         }
       },
       
@@ -144,9 +224,17 @@ export const useHVACStore = create<HVACStore>()(
         set({ timeRange: range });
       },
       
-      refreshData: () => {
-        const initialState = generateInitialHVACState();
-        set(initialState);
+      refreshData: async () => {
+        const version = ++liveFetchVersion;
+        try {
+          const liveState = await buildLiveState();
+          if (version !== liveFetchVersion) return; // superseded by a newer fetch
+          set({ ...liveState, aiOptimizationActive: get().aiOptimizationActive });
+        } catch (err) {
+          if (version !== liveFetchVersion) return;
+          console.error('Failed to refresh live backend data, falling back to mock data:', err);
+          set(generateInitialHVACState());
+        }
       },
       
       // UI State setters

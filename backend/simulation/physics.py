@@ -45,8 +45,12 @@ def compute_damper_response(
     return prev_damper + delta
 
 
-def compute_airflow(damper_position: float, min_airflow: float, max_airflow: float) -> float:
+def compute_airflow(
+    damper_position: float, min_airflow: float, max_airflow: float, add_noise: bool = True
+) -> float:
     base = min_airflow + (max_airflow - min_airflow) * damper_position / 100.0
+    if not add_noise:
+        return _clip(base, min_airflow, max_airflow)
     noisy = base + random.gauss(0, (max_airflow - min_airflow) * 0.02)
     return _clip(noisy, min_airflow, max_airflow)
 
@@ -60,12 +64,16 @@ def step_temperature(
     area_m2: float,
     room_type: str,
     dt_minutes: float = 5.0,
+    add_noise: bool = True,
 ) -> tuple[float, float]:
     """Advance zone temperature by one physics step.
 
     Thermal time constant for these zone sizes works out to roughly 60-90
     minutes, well above the 5-minute step, so plain Euler integration stays
     numerically stable and non-oscillatory without substeps.
+
+    `add_noise=False` gives a deterministic projection, used by the optimizer
+    to score candidate damper positions against each other on equal footing.
     """
     c_thermal = area_m2 * THERMAL_MASS_PER_M2  # kJ/°C
     ua = area_m2 * UA_PER_M2  # kW/°C
@@ -85,7 +93,8 @@ def step_temperature(
     q_net = q_person + q_equipment + q_env - cooling_kw  # kW
 
     dT_per_min = q_net * 60.0 / c_thermal
-    new_temp = current_temp + dT_per_min * dt_minutes + random.gauss(0, TEMP_NOISE_SIGMA)
+    noise = random.gauss(0, TEMP_NOISE_SIGMA) if add_noise else 0.0
+    new_temp = current_temp + dT_per_min * dt_minutes + noise
     return new_temp, cooling_kw
 
 

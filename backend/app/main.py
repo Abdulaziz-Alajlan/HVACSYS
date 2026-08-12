@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 from app.ml import predictor
-from app.routes import predictions, readings, zones
+from app.routes import predictions, readings, recommendations, zones
 
 
 @asynccontextmanager
@@ -35,6 +35,7 @@ app.add_middleware(
 app.include_router(zones.router)
 app.include_router(readings.router)
 app.include_router(predictions.router)
+app.include_router(recommendations.router)
 
 
 @app.get("/health")
