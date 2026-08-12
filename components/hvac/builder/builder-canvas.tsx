@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { nodeTypes } from "./custom-nodes";
-import { useBuilderStore, type HVACEdge, type HVACNode } from "@/lib/builder-store";
+import { useBuilderStore, type HVACEdge, type HVACNode, type RoomNodeData } from "@/lib/builder-store";
 import {
   ZoomIn,
   ZoomOut,
@@ -25,6 +25,8 @@ import {
   Pause,
   RotateCcw,
   Download,
+  Sparkles,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,7 +37,7 @@ const proOptions = { hideAttribution: true };
 export function BuilderCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { fitView, zoomIn, zoomOut } = useReactFlow();
-  
+
   const {
     nodes,
     edges,
@@ -47,7 +49,16 @@ export function BuilderCanvas() {
     resetLayout,
     selectedNodeId,
     setSelectedNode,
+    aiOverlayEnabled,
+    toggleAIOverlay,
+    runAIOptimizeAll,
+    applyAllRecommendations,
   } = useBuilderStore();
+
+  const zoneRoomCount = nodes.filter((n) => n.data.type === "room" && (n.data as RoomNodeData).zoneId !== undefined).length;
+  const pendingRecommendationCount = nodes.filter(
+    (n) => n.data.type === "room" && (n.data as RoomNodeData).aiRecommendation?.status === "pending"
+  ).length;
 
   // Ensure all nodes have valid positions
   const validNodes = useMemo(() => {
@@ -237,6 +248,56 @@ export function BuilderCanvas() {
               className="h-8 w-8 p-0"
             >
               <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
+            <Button
+              variant={aiOverlayEnabled ? "default" : "ghost"}
+              size="sm"
+              onClick={toggleAIOverlay}
+              className={cn("h-8 gap-1.5", aiOverlayEnabled && "bg-primary hover:bg-primary/90")}
+              title="Highlight rooms with a pending AI recommendation"
+            >
+              <Sparkles className="h-4 w-4" />
+              AI Overlay
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5"
+              disabled={zoneRoomCount === 0}
+              onClick={() =>
+                toast.promise(runAIOptimizeAll(), {
+                  loading: "Running AI Optimize...",
+                  success: "AI recommendations updated",
+                  error: "Failed to run AI Optimize",
+                })
+              }
+            >
+              <Sparkles className="h-4 w-4" />
+              Optimize All
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5"
+              disabled={pendingRecommendationCount === 0}
+              onClick={() =>
+                toast.promise(applyAllRecommendations(), {
+                  loading: "Applying recommendations...",
+                  success: "Recommendations applied",
+                  error: "Failed to apply recommendations",
+                })
+              }
+            >
+              <CheckCheck className="h-4 w-4" />
+              Apply All
+              {pendingRecommendationCount > 0 && (
+                <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">
+                  {pendingRecommendationCount}
+                </Badge>
+              )}
             </Button>
           </div>
 

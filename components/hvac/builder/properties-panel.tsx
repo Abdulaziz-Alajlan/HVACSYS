@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useBuilderStore } from "@/lib/builder-store";
+import { useBuilderStore, type RoomNodeData } from "@/lib/builder-store";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,11 @@ import {
   Building2,
   Gauge,
   Zap,
+  Sparkles,
+  Users,
+  Lock,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -51,8 +56,16 @@ const nodeColors: Record<string, string> = {
 };
 
 export function PropertiesPanel() {
-  const { nodes, selectedNodeId, updateNodeData, deleteNode, duplicateNode } =
-    useBuilderStore();
+  const {
+    nodes,
+    selectedNodeId,
+    updateNodeData,
+    deleteNode,
+    duplicateNode,
+    runAIOptimize,
+    applyRecommendation,
+    triggerScenario,
+  } = useBuilderStore();
   const node = nodes.find((n) => n.id === selectedNodeId);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
 
@@ -384,6 +397,149 @@ export function PropertiesPanel() {
             </div>
           </>
         )}
+
+        {node.type === "room" && (() => {
+          const roomData = node.data as RoomNodeData;
+          const hasZone = roomData.zoneId !== undefined;
+          const rec = roomData.aiRecommendation;
+          const loading = Boolean(roomData.aiLoading);
+
+          return (
+            <>
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">Current Temp (°C)</Label>
+                <Input
+                  type="number"
+                  value={String(localData.currentTemp ?? "")}
+                  onChange={(e) => handleChange("currentTemp", parseFloat(e.target.value) || 0)}
+                  className="h-9"
+                  disabled={hasZone}
+                />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">Target Temp (°C)</Label>
+                <Input
+                  type="number"
+                  value={String(localData.targetTemp ?? "")}
+                  onChange={(e) => handleChange("targetTemp", parseFloat(e.target.value) || 0)}
+                  className="h-9"
+                  disabled={hasZone}
+                />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">Occupancy</Label>
+                <Input
+                  type="number"
+                  value={String(localData.occupancy ?? "")}
+                  onChange={(e) => handleChange("occupancy", parseInt(e.target.value) || 0)}
+                  className="h-9"
+                  disabled={hasZone}
+                />
+              </div>
+
+              <Separator />
+
+              {!hasZone && (
+                <p className="text-xs text-muted-foreground">
+                  No matching backend zone for &quot;{roomData.name}&quot; — editing local values only.
+                </p>
+              )}
+
+              {hasZone && selectedNodeId && (
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={() => runAIOptimize(selectedNodeId)}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    AI Optimize
+                  </Button>
+
+                  {rec && (
+                    <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {rec.action.replace(/_/g, " ")}
+                        </Badge>
+                        <Badge
+                          variant={rec.status === "applied" ? "default" : "outline"}
+                          className="text-[10px] capitalize"
+                        >
+                          {rec.status === "applied" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                          {rec.status}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{rec.reason}</p>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Energy change</span>
+                        <span className={rec.estimatedEnergyChange < 0 ? "text-success" : "text-foreground"}>
+                          {rec.estimatedEnergyChange >= 0 ? "+" : ""}
+                          {rec.estimatedEnergyChange.toFixed(3)} kWh
+                        </span>
+                      </div>
+                      {rec.status === "pending" && (
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          onClick={() => applyRecommendation(selectedNodeId)}
+                          disabled={loading}
+                        >
+                          {loading && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+                          Apply
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Inject Scenario
+                  </p>
+                  <div className="grid grid-cols-1 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="justify-start gap-2"
+                      onClick={() => triggerScenario(selectedNodeId, "occupancy_surge")}
+                      disabled={loading}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      Occupancy Surge
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="justify-start gap-2"
+                      onClick={() => triggerScenario(selectedNodeId, "hot_outdoor_period")}
+                      disabled={loading}
+                    >
+                      <Flame className="h-3.5 w-3.5" />
+                      Hot Outdoor Period
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="justify-start gap-2"
+                      onClick={() => triggerScenario(selectedNodeId, "blocked_damper")}
+                      disabled={loading}
+                    >
+                      <Lock className="h-3.5 w-3.5" />
+                      Blocked Damper
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {node.type === "sensor" && (
           <>

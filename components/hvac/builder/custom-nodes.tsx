@@ -3,6 +3,7 @@
 import { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
+import { useBuilderStore } from "@/lib/builder-store";
 import {
   Wind,
   Thermometer,
@@ -13,6 +14,8 @@ import {
   Gauge,
   Zap,
   CircleDot,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 
 // Base node wrapper with consistent styling
@@ -536,8 +539,12 @@ export const RoomNode = memo(function RoomNode({
     capacity?: number;
     comfortScore?: number;
     status?: string;
+    zoneId?: number;
+    aiLoading?: boolean;
+    aiRecommendation?: { status: string } | null;
   };
 }) {
+  const aiOverlayEnabled = useBuilderStore((s) => s.aiOverlayEnabled);
   const statusColors: Record<string, string> = {
     "Comfort Cooling": "bg-success/20 border-success/50",
     "Coolers Started": "bg-chart-2/20 border-chart-2/50",
@@ -545,11 +552,16 @@ export const RoomNode = memo(function RoomNode({
     "Expected to Start in a Bit": "bg-chart-1/20 border-chart-1/50",
     "Starting in 10 Minutes": "bg-warning/20 border-warning/50",
   };
+  const hasPendingRecommendation = aiOverlayEnabled && data.aiRecommendation?.status === "pending";
 
   return (
     <NodeWrapper
       selected={selected}
-      className={cn("min-w-[180px]", statusColors[data.status || "Inactive Cooling"] || "bg-muted")}
+      className={cn(
+        "min-w-[180px]",
+        statusColors[data.status || "Inactive Cooling"] || "bg-muted",
+        hasPendingRecommendation && "ring-2 ring-primary glow-primary"
+      )}
     >
       <Handle
         type="target"
@@ -561,8 +573,12 @@ export const RoomNode = memo(function RoomNode({
           <Building2 className="h-4 w-4 text-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">
+          <p className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
             {data.name || "Room"}
+            {data.aiLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+            {hasPendingRecommendation && !data.aiLoading && (
+              <Sparkles className="h-3 w-3 text-primary" />
+            )}
           </p>
           <p className="text-xs text-muted-foreground capitalize">
             {data.roomType?.replace("-", " ") || "Room"}

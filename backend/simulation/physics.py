@@ -55,6 +55,19 @@ def compute_airflow(
     return _clip(noisy, min_airflow, max_airflow)
 
 
+def damper_from_airflow(airflow_cfm: float, min_airflow: float, max_airflow: float) -> float:
+    """Inverse of compute_airflow's deterministic mapping: airflow -> damper %.
+
+    Used when a caller has a target airflow (e.g. a Recommendation's
+    recommended_airflow) and needs the damper position that produces it,
+    without re-deriving the linear relationship inline.
+    """
+    if max_airflow <= min_airflow:
+        return 0.0
+    damper = (airflow_cfm - min_airflow) / (max_airflow - min_airflow) * 100.0
+    return _clip(damper, 0.0, 100.0)
+
+
 def step_temperature(
     current_temp: float,
     outdoor_temp: float,

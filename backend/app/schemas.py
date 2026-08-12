@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -69,3 +70,12 @@ class RecommendationOut(BaseModel):
     estimated_energy_change: float
     comfort_impact: str | None
     status: str
+
+
+class RecommendationApplyOut(BaseModel):
+    recommendation: RecommendationOut
+    new_reading: SensorReadingOut
+
+
+class ScenarioRequest(BaseModel):
+    scenario: Literal["occupancy_surge", "hot_outdoor_period", "blocked_damper"]

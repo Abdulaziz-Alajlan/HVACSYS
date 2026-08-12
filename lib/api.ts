@@ -51,6 +51,13 @@ export interface ApiRecommendation {
   status: string;
 }
 
+export interface ApiRecommendationApplyResult {
+  recommendation: ApiRecommendation;
+  new_reading: ApiReading;
+}
+
+export type ApiScenario = 'occupancy_surge' | 'hot_outdoor_period' | 'blocked_damper';
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
@@ -67,5 +74,11 @@ export const api = {
   recommendZone: (zoneId: number) =>
     apiFetch<ApiRecommendation>(`/api/recommendations/${zoneId}`, { method: 'POST' }),
   applyRecommendation: (id: number) =>
-    apiFetch<ApiRecommendation>(`/api/recommendations/${id}/apply`, { method: 'POST' }),
+    apiFetch<ApiRecommendationApplyResult>(`/api/recommendations/${id}/apply`, { method: 'POST' }),
+  triggerScenario: (zoneId: number, scenario: ApiScenario) =>
+    apiFetch<ApiReading>(`/api/zones/${zoneId}/scenario`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario }),
+    }),
 };

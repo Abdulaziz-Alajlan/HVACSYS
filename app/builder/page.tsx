@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import {
   DndContext,
@@ -16,6 +16,7 @@ import { NodePalette } from "@/components/hvac/builder/node-palette";
 import { BuilderCanvas } from "@/components/hvac/builder/builder-canvas";
 import { PropertiesPanel } from "@/components/hvac/builder/properties-panel";
 import { useBuilderStore } from "@/lib/builder-store";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Wind, Snowflake, Flame, Fan, Building2, Gauge, Zap } from "lucide-react";
 import Link from "next/link";
@@ -45,6 +46,17 @@ const nodeColors: Record<string, string> = {
 function BuilderContent() {
   const [activeDrag, setActiveDrag] = useState<{ type: string; label: string } | null>(null);
   const addNode = useBuilderStore((s) => s.addNode);
+  const syncZoneMapping = useBuilderStore((s) => s.syncZoneMapping);
+
+  // Map room nodes whose name matches a real backend zone, so AI Optimize/
+  // Apply/scenario actions know which zone to call. Silently no-ops if the
+  // backend isn't reachable — the builder still works as a freeform editor.
+  useEffect(() => {
+    api
+      .getZones()
+      .then((zones) => syncZoneMapping(zones.map((z) => ({ id: z.id, name: z.name }))))
+      .catch((err) => console.error('Failed to sync builder zones with backend:', err));
+  }, [syncZoneMapping]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {

@@ -3,9 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.live_tick import run_tick
 from app.ml import optimizer
 from app.models import Recommendation, Zone
-from app.schemas import RecommendationOut
+from app.schemas import RecommendationApplyOut, RecommendationOut
+from simulation import physics
 
 router = APIRouter(prefix="/api", tags=["recommendations"])
 
@@ -47,7 +49,7 @@ def list_zone_recommendations(
     return list(reversed(recommendations))
 
 
-@router.post("/recommendations/{recommendation_id}/apply", response_model=RecommendationOut)
+@router.post("/recommendations/{recommendation_id}/apply", response_model=RecommendationApplyOut)
 def apply_recommendation(recommendation_id: int, db: Session = Depends(get_db)):
     recommendation = db.get(Recommendation, recommendation_id)
     if recommendation is None:
@@ -55,7 +57,19 @@ def apply_recommendation(recommendation_id: int, db: Session = Depends(get_db)):
     if recommendation.status != "pending":
         raise HTTPException(status_code=400, detail=f"Recommendation is already '{recommendation.status}'")
 
+    zone = db.get(Zone, recommendation.zone_id)
+    if zone is None:
+        raise HTTPException(status_code=404, detail="Zone not found")
+
+    # Force the damper to the recommended position for this tick, rather than
+    # letting the normal P-controller pick it — this is what makes "apply"
+    # actually mutate simulator state instead of just flipping a status flag.
+    damper = physics.damper_from_airflow(recommendation.recommended_airflow, zone.min_airflow, zone.max_airflow)
+    new_reading = run_tick(db, zone, damper_override=damper)
+    if new_reading is None:
+        raise HTTPException(status_code=400, detail="Zone has no sensor history to apply against")
+
     recommendation.status = "applied"
     db.commit()
     db.refresh(recommendation)
-    return recommendation
+    return RecommendationApplyOut(recommendation=recommendation, new_reading=new_reading)

@@ -13,6 +13,8 @@ import {
   applyEdgeChanges,
   MarkerType,
 } from '@xyflow/react';
+import { toast } from 'sonner';
+import { api, type ApiScenario } from './api';
 
 // Node data types
 export interface CoolingUnitNodeData extends Record<string, unknown> {
@@ -40,6 +42,16 @@ export interface DamperNodeData extends Record<string, unknown> {
   warnings: string[];
 }
 
+export interface RoomAIRecommendation {
+  id: number;
+  action: string;
+  reason: string;
+  recommendedAirflow: number;
+  estimatedEnergyChange: number;
+  comfortImpact: string | null;
+  status: string;
+}
+
 export interface RoomNodeData extends Record<string, unknown> {
   type: 'room';
   name: string;
@@ -52,6 +64,12 @@ export interface RoomNodeData extends Record<string, unknown> {
   status: 'Inactive Cooling' | 'Comfort Cooling' | 'Expected to Start in a Bit' | 'Coolers Started' | 'Starting in 10 Minutes';
   airflow: number;
   issues: string[];
+  // Real backend zone this node maps to, set by syncZoneMapping() matching
+  // on name; undefined for freeform/user-added rooms with no backend zone —
+  // AI Optimize/Apply/scenario actions are unavailable for those.
+  zoneId?: number;
+  aiLoading?: boolean;
+  aiRecommendation?: RoomAIRecommendation | null;
 }
 
 export interface GenericBuilderNodeData {
@@ -95,6 +113,14 @@ interface BuilderState {
   randomizeMetadata: () => void;
   saveLayout: () => void;
   loadLayout: () => void;
+
+  // Backend-integration actions (Day 4)
+  syncZoneMapping: (zones: { id: number; name: string }[]) => void;
+  runAIOptimize: (nodeId: string) => Promise<void>;
+  runAIOptimizeAll: () => Promise<void>;
+  applyRecommendation: (nodeId: string) => Promise<void>;
+  applyAllRecommendations: () => Promise<void>;
+  triggerScenario: (nodeId: string, scenario: ApiScenario) => Promise<void>;
 }
 
 // Generate random metadata for nodes
@@ -324,6 +350,26 @@ const initialEdges: HVACEdge[] = [
   },
 ];
 
+// Guards the per-node async actions below (runAIOptimize/applyRecommendation/
+// triggerScenario) against overlapping requests for the same node — e.g.
+// "Optimize All" running while the user also clicks the individual button
+// for one of those same rooms. Without this, whichever request resolves
+// last wins even if it was started first, silently overwriting a newer
+// result with a stale one. Same version-counter pattern used in
+// hvac-store.ts for initialize()/refreshData(), scoped per-node here since
+// these are per-node operations rather than a single global fetch.
+const nodeFetchVersions = new Map<string, number>();
+
+function bumpNodeVersion(nodeId: string): number {
+  const next = (nodeFetchVersions.get(nodeId) ?? 0) + 1;
+  nodeFetchVersions.set(nodeId, next);
+  return next;
+}
+
+function isCurrentNodeVersion(nodeId: string, version: number): boolean {
+  return nodeFetchVersions.get(nodeId) === version;
+}
+
 export const useBuilderStore = create<BuilderState>()(
   persist(
     (set, get) => ({
@@ -468,6 +514,151 @@ export const useBuilderStore = create<BuilderState>()(
       loadLayout: () => {
         // Layout is auto-loaded via persist middleware
         console.log('Layout loaded');
+      },
+
+      syncZoneMapping: (zones) => {
+        // Also clears aiLoading: a request in flight when the page reloads
+        // would otherwise leave a stuck spinner, since persist saves node
+        // data (including aiLoading) to localStorage.
+        set({
+          nodes: get().nodes.map((n) => {
+            if (n.data.type !== 'room') return n;
+            const match = zones.find((z) => z.name === (n.data as RoomNodeData).name);
+            return { ...n, data: { ...n.data, zoneId: match?.id, aiLoading: false } as HVACNodeData };
+          }),
+        });
+      },
+
+      runAIOptimize: async (nodeId) => {
+        const node = get().nodes.find((n) => n.id === nodeId);
+        if (!node || node.data.type !== 'room') return;
+        const roomData = node.data as RoomNodeData;
+        if (roomData.zoneId === undefined) {
+          toast.error(`${roomData.name} has no matching backend zone`);
+          return;
+        }
+
+        const version = bumpNodeVersion(nodeId);
+        get().updateNodeData(nodeId, { aiLoading: true });
+        try {
+          const rec = await api.recommendZone(roomData.zoneId);
+          if (!isCurrentNodeVersion(nodeId, version)) return; // superseded by a newer request
+          get().updateNodeData(nodeId, {
+            aiLoading: false,
+            aiRecommendation: {
+              id: rec.id,
+              action: rec.action,
+              reason: rec.reason,
+              recommendedAirflow: rec.recommended_airflow,
+              estimatedEnergyChange: rec.estimated_energy_change,
+              comfortImpact: rec.comfort_impact,
+              status: rec.status,
+            },
+          });
+          toast.success(`AI recommendation ready for ${roomData.name}`);
+        } catch (err) {
+          if (!isCurrentNodeVersion(nodeId, version)) return;
+          get().updateNodeData(nodeId, { aiLoading: false });
+          toast.error(`Failed to get AI recommendation for ${roomData.name}`);
+          console.error(err);
+        }
+      },
+
+      runAIOptimizeAll: async () => {
+        const roomNodeIds = get()
+          .nodes.filter((n) => n.data.type === 'room' && (n.data as RoomNodeData).zoneId !== undefined)
+          .map((n) => n.id);
+        await Promise.all(roomNodeIds.map((id) => get().runAIOptimize(id)));
+      },
+
+      applyRecommendation: async (nodeId) => {
+        const node = get().nodes.find((n) => n.id === nodeId);
+        if (!node || node.data.type !== 'room') return;
+        const roomData = node.data as RoomNodeData;
+        if (roomData.zoneId === undefined || !roomData.aiRecommendation || roomData.aiRecommendation.status !== 'pending') {
+          return;
+        }
+
+        const version = bumpNodeVersion(nodeId);
+        get().updateNodeData(nodeId, { aiLoading: true });
+        try {
+          const result = await api.applyRecommendation(roomData.aiRecommendation.id);
+          if (!isCurrentNodeVersion(nodeId, version)) return; // superseded by a newer request
+          const reading = result.new_reading;
+          get().updateNodeData(nodeId, {
+            aiLoading: false,
+            currentTemp: reading.temperature,
+            occupancy: reading.occupancy,
+            airflow: reading.airflow,
+            aiRecommendation: { ...roomData.aiRecommendation, status: 'applied' },
+          });
+
+          const upstreamEdge = get().edges.find((e) => e.target === nodeId);
+          const damperNode = upstreamEdge
+            ? get().nodes.find((n) => n.id === upstreamEdge.source && n.data.type === 'damper')
+            : undefined;
+          if (damperNode) {
+            get().updateNodeData(damperNode.id, {
+              openness: reading.damper_position,
+              airflow: reading.airflow,
+              lastAdjustment: new Date(),
+            });
+          }
+          toast.success(`Applied AI recommendation to ${roomData.name}`);
+        } catch (err) {
+          if (!isCurrentNodeVersion(nodeId, version)) return;
+          get().updateNodeData(nodeId, { aiLoading: false });
+          toast.error(`Failed to apply recommendation for ${roomData.name}`);
+          console.error(err);
+        }
+      },
+
+      applyAllRecommendations: async () => {
+        const roomNodeIds = get()
+          .nodes.filter((n) => n.data.type === 'room' && (n.data as RoomNodeData).aiRecommendation?.status === 'pending')
+          .map((n) => n.id);
+        await Promise.all(roomNodeIds.map((id) => get().applyRecommendation(id)));
+      },
+
+      triggerScenario: async (nodeId, scenario) => {
+        const node = get().nodes.find((n) => n.id === nodeId);
+        if (!node || node.data.type !== 'room') return;
+        const roomData = node.data as RoomNodeData;
+        if (roomData.zoneId === undefined) {
+          toast.error(`${roomData.name} has no matching backend zone`);
+          return;
+        }
+
+        const version = bumpNodeVersion(nodeId);
+        get().updateNodeData(nodeId, { aiLoading: true });
+        try {
+          const reading = await api.triggerScenario(roomData.zoneId, scenario);
+          if (!isCurrentNodeVersion(nodeId, version)) return; // superseded by a newer request
+          get().updateNodeData(nodeId, {
+            aiLoading: false,
+            currentTemp: reading.temperature,
+            occupancy: reading.occupancy,
+            airflow: reading.airflow,
+          });
+
+          const upstreamEdge = get().edges.find((e) => e.target === nodeId);
+          const damperNode = upstreamEdge
+            ? get().nodes.find((n) => n.id === upstreamEdge.source && n.data.type === 'damper')
+            : undefined;
+          if (damperNode) {
+            get().updateNodeData(damperNode.id, {
+              openness: reading.damper_position,
+              airflow: reading.airflow,
+              lastAdjustment: new Date(),
+            });
+          }
+          toast.success(`Injected ${scenario.replace(/_/g, ' ')} on ${roomData.name}`);
+        } catch (err) {
+          if (!isCurrentNodeVersion(nodeId, version)) return;
+          get().updateNodeData(nodeId, { aiLoading: false });
+          toast.error(`Failed to inject scenario on ${roomData.name}`);
+          console.error(err);
+        }
       },
     }),
     {
