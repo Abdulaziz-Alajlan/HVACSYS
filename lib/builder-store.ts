@@ -51,6 +51,11 @@ export interface RoomAIRecommendation {
   estimatedEnergyChange: number;
   comfortImpact: string | null;
   status: string;
+  // When this recommendation was generated — the panel doesn't auto-refresh,
+  // so without this a recommendation from minutes ago (against room state
+  // that's since moved on) looks identical to a fresh one, which reads as
+  // "the AI is stuck" rather than "the room changed since you last asked."
+  fetchedAt: string;
 }
 
 export interface RoomNodeData extends Record<string, unknown> {
@@ -605,6 +610,7 @@ export const useBuilderStore = create<BuilderState>()(
               estimatedEnergyChange: rec.estimated_energy_change,
               comfortImpact: rec.comfort_impact,
               status: rec.status,
+              fetchedAt: new Date().toISOString(),
             },
           });
           toast.success(`AI recommendation ready for ${roomData.name}`);

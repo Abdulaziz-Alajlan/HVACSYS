@@ -4,6 +4,7 @@ import { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { useBuilderStore } from "@/lib/builder-store";
+import { RelativeTime } from "@/components/hvac/relative-time";
 import {
   Wind,
   Thermometer,
@@ -16,6 +17,7 @@ import {
   CircleDot,
   Sparkles,
   Loader2,
+  Clock,
 } from "lucide-react";
 
 // Base node wrapper with consistent styling
@@ -473,6 +475,7 @@ export const DamperNode = memo(function DamperNode({
     airflow?: number;
     healthScore?: number;
     actuatorStatus?: string;
+    lastAdjustment?: Date | string;
   };
 }) {
   return (
@@ -516,6 +519,14 @@ export const DamperNode = memo(function DamperNode({
           {data.actuatorStatus || "Normal"}
         </span>
       </div>
+      {data.lastAdjustment && (
+        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+          <Clock className="h-2.5 w-2.5" />
+          <span>
+            Adjusted <RelativeTime date={data.lastAdjustment} />
+          </span>
+        </div>
+      )}
       <Handle
         type="source"
         position={Position.Right}

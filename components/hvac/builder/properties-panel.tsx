@@ -31,9 +31,11 @@ import {
   Lock,
   Loader2,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { RelativeTime } from "@/components/hvac/relative-time";
 
 const nodeIcons: Record<string, React.ReactNode> = {
   ahu: <Wind className="h-4 w-4" />,
@@ -484,16 +486,28 @@ export function PropertiesPanel() {
                           {rec.estimatedEnergyChange.toFixed(3)} kWh
                         </span>
                       </div>
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          Recommended <RelativeTime date={rec.fetchedAt} />
+                        </span>
+                      </div>
                       {rec.status === "pending" && (
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          onClick={() => applyRecommendation(selectedNodeId)}
-                          disabled={loading}
-                        >
-                          {loading && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
-                          Apply
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={() => applyRecommendation(selectedNodeId)}
+                            disabled={loading}
+                          >
+                            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+                            Apply
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground">
+                            Room state doesn&apos;t auto-refresh here — if it&apos;s been a while, click AI Optimize
+                            again before applying to make sure this still reflects the current state.
+                          </p>
+                        </>
                       )}
                     </div>
                   )}

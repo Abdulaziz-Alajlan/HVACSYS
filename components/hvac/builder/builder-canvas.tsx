@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useMemo } from "react";
+import { useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -27,6 +27,7 @@ import {
   Download,
   Sparkles,
   CheckCheck,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -60,55 +61,72 @@ export function BuilderCanvas() {
     (n) => n.data.type === "room" && (n.data as RoomNodeData).aiRecommendation?.status === "pending"
   ).length;
 
-  // Ensure all nodes have valid positions
-  const validNodes = useMemo(() => {
-    return nodes.map((node, index) => {
-      if (!node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
-        return {
-          ...node,
-          position: { x: 100 + (index % 3) * 250, y: 100 + Math.floor(index / 3) * 150 },
-        };
-      }
-      return node;
+  // Per-room aiLoading already exists, but these batch buttons had no
+  // feedback of their own — clicking "Optimize All" while it's still
+  // running looked identical to it doing nothing.
+  const [isOptimizingAll, setIsOptimizingAll] = useState(false);
+  const [isApplyingAll, setIsApplyingAll] = useState(false);
+
+  const handleOptimizeAll = async () => {
+    setIsOptimizingAll(true);
+    const run = runAIOptimizeAll();
+    toast.promise(run, {
+      loading: "Running AI Optimize...",
+      success: "AI recommendations updated",
+      error: "Failed to run AI Optimize",
     });
-  }, [nodes]);
+    await run;
+    setIsOptimizingAll(false);
+  };
+
+  const handleApplyAll = async () => {
+    setIsApplyingAll(true);
+    const run = applyAllRecommendations();
+    toast.promise(run, {
+      loading: "Applying recommendations...",
+      success: "Recommendations applied",
+      error: "Failed to apply recommendations",
+    });
+    await run;
+    setIsApplyingAll(false);
+  };
+
+  // Ensure all nodes have valid positions. No useMemo — the React Compiler
+  // (enabled in next.config.mjs) handles memoization automatically.
+  const validNodes = nodes.map((node, index) => {
+    if (!node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
+      return {
+        ...node,
+        position: { x: 100 + (index % 3) * 250, y: 100 + Math.floor(index / 3) * 150 },
+      };
+    }
+    return node;
+  });
 
   const { setNodeRef, isOver } = useDroppable({
     id: "builder-canvas",
   });
 
-  const handleNodesChange = useCallback(
-    (changes: NodeChange<HVACNode>[]) => {
-      storeOnNodesChange(changes);
-    },
-    [storeOnNodesChange]
-  );
+  const handleNodesChange = (changes: NodeChange<HVACNode>[]) => {
+    storeOnNodesChange(changes);
+  };
 
-  const handleEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      storeOnEdgesChange(changes);
-    },
-    [storeOnEdgesChange]
-  );
+  const handleEdgesChange = (changes: EdgeChange[]) => {
+    storeOnEdgesChange(changes);
+  };
 
-  const handleConnect = useCallback(
-    (connection: Connection) => {
-      storeOnConnect(connection);
-      toast.success("Connection created");
-    },
-    [storeOnConnect]
-  );
+  const handleConnect = (connection: Connection) => {
+    storeOnConnect(connection);
+    toast.success("Connection created");
+  };
 
-  const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: HVACNode) => {
-      setSelectedNode(node.id);
-    },
-    [setSelectedNode]
-  );
+  const onNodeClick = (_: React.MouseEvent, node: HVACNode) => {
+    setSelectedNode(node.id);
+  };
 
-  const onPaneClick = useCallback(() => {
+  const onPaneClick = () => {
     setSelectedNode(null);
-  }, [setSelectedNode]);
+  };
 
   const handleSave = () => {
     const data = { nodes, edges };
@@ -266,32 +284,24 @@ export function BuilderCanvas() {
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5"
-              disabled={zoneRoomCount === 0}
-              onClick={() =>
-                toast.promise(runAIOptimizeAll(), {
-                  loading: "Running AI Optimize...",
-                  success: "AI recommendations updated",
-                  error: "Failed to run AI Optimize",
-                })
-              }
+              disabled={zoneRoomCount === 0 || isOptimizingAll}
+              onClick={handleOptimizeAll}
             >
-              <Sparkles className="h-4 w-4" />
+              {isOptimizingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
               Optimize All
             </Button>
             <Button
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5"
-              disabled={pendingRecommendationCount === 0}
-              onClick={() =>
-                toast.promise(applyAllRecommendations(), {
-                  loading: "Applying recommendations...",
-                  success: "Recommendations applied",
-                  error: "Failed to apply recommendations",
-                })
-              }
+              disabled={pendingRecommendationCount === 0 || isApplyingAll}
+              onClick={handleApplyAll}
             >
-              <CheckCheck className="h-4 w-4" />
+              {isApplyingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCheck className="h-4 w-4" />}
               Apply All
               {pendingRecommendationCount > 0 && (
                 <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">
