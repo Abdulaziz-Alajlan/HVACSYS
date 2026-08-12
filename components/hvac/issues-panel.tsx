@@ -20,7 +20,7 @@ import {
 import { useHVACStore } from '@/lib/hvac-store';
 import type { Issue, MaintenanceEvent, Recommendation } from '@/lib/hvac-types';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { RelativeTime } from './relative-time';
 
 const severityConfig = {
   critical: { icon: AlertTriangle, className: 'text-destructive', bgClassName: 'bg-destructive/10' },
@@ -35,7 +35,6 @@ function IssueItem({ issue, onAcknowledge, onResolve }: {
 }) {
   const config = severityConfig[issue.severity];
   const Icon = config.icon;
-  const timeAgo = formatDistanceToNow(new Date(issue.timestamp), { addSuffix: true });
 
   return (
     <div className={cn(
@@ -67,7 +66,7 @@ function IssueItem({ issue, onAcknowledge, onResolve }: {
           <div className="mt-2 flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span>{timeAgo}</span>
+              <span><RelativeTime date={issue.timestamp} /></span>
               <span className="text-border">|</span>
               <span>{issue.source}</span>
             </div>

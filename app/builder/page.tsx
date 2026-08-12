@@ -48,13 +48,15 @@ function BuilderContent() {
   const addNode = useBuilderStore((s) => s.addNode);
   const syncZoneMapping = useBuilderStore((s) => s.syncZoneMapping);
 
-  // Map room nodes whose name matches a real backend zone, so AI Optimize/
-  // Apply/scenario actions know which zone to call. Silently no-ops if the
-  // backend isn't reachable — the builder still works as a freeform editor.
+  // Map room nodes whose name matches a real backend zone (and pull their
+  // real current/target temp, occupancy, etc.), so AI Optimize/Apply/
+  // scenario actions know which zone to call and the panel shows real
+  // values, not the default layout's random mock data. Silently no-ops if
+  // the backend isn't reachable — the builder still works as a freeform editor.
   useEffect(() => {
     api
       .getZones()
-      .then((zones) => syncZoneMapping(zones.map((z) => ({ id: z.id, name: z.name }))))
+      .then((zones) => syncZoneMapping(zones))
       .catch((err) => console.error('Failed to sync builder zones with backend:', err));
   }, [syncZoneMapping]);
 

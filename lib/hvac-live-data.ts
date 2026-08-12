@@ -9,7 +9,8 @@
 // that look identical to a viewer.
 
 import { api, type ApiPrediction, type ApiReading, type ApiRecommendation, type ApiZone } from './api';
-import type { CoolingStatus, Room, RoomType } from './hvac-types';
+import type { Room, RoomType } from './hvac-types';
+import { computeComfortScore, computeIssueFlags, deriveCoolingStatus } from './zone-derived';
 
 const HISTORY_LIMIT = 288; // 24h at 5-min intervals
 
@@ -66,25 +67,24 @@ export async function fetchLiveZoneBundles(aiEnabled: boolean): Promise<LiveZone
   return bundles.filter((b): b is LiveZoneBundle => b !== null);
 }
 
-function deriveCoolingStatus(damperPosition: number, occupancy: number): CoolingStatus {
-  if (occupancy === 0 && damperPosition < 20) return 'Inactive Cooling';
-  if (damperPosition >= 70) return 'Coolers Started';
-  if (damperPosition >= 30) return 'Comfort Cooling';
-  return 'Expected to Start in a Bit';
-}
-
 export function bundleToRoom(bundle: LiveZoneBundle): Room {
   const { zone, latestReading, prediction, history } = bundle;
   const meta = ZONE_ROOM_META[zone.name];
 
-  const tempDeviation = Math.abs(latestReading.temperature - zone.target_temperature);
-  const occupancyRatio = zone.capacity > 0 ? latestReading.occupancy / zone.capacity : 0;
-  const comfortScore = Math.max(30, Math.min(100, 100 - tempDeviation * 15 - occupancyRatio * 10));
-
-  const issueFlags: string[] = [];
-  if (tempDeviation > 3) issueFlags.push('Temperature deviation');
-  if (latestReading.occupancy > zone.capacity * 0.9) issueFlags.push('Near capacity');
-  if (latestReading.airflow < 300 && zone.room_type !== 'lobby') issueFlags.push('Low airflow');
+  const comfortScore = computeComfortScore(
+    latestReading.temperature,
+    zone.target_temperature,
+    latestReading.occupancy,
+    zone.capacity
+  );
+  const issueFlags = computeIssueFlags(
+    latestReading.temperature,
+    zone.target_temperature,
+    latestReading.occupancy,
+    zone.capacity,
+    latestReading.airflow,
+    zone.room_type
+  );
 
   return {
     id: meta.id,

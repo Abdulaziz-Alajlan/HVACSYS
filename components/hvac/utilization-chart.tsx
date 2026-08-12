@@ -34,9 +34,10 @@ interface ChartTooltipProps {
     dataKey: string;
   }>;
   label?: string;
+  activeZones?: number;
 }
 
-function CustomTooltip({ active, payload, label }: ChartTooltipProps) {
+function CustomTooltip({ active, payload, label, activeZones }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
 
   return (
@@ -60,7 +61,7 @@ function CustomTooltip({ active, payload, label }: ChartTooltipProps) {
       </div>
       <div className="mt-2 border-t border-border pt-2">
         <p className="text-xs text-muted-foreground">
-          Active zones: {Math.floor(Math.random() * 4 + 3)}
+          Active zones: {activeZones ?? '—'}
         </p>
         <p className="text-xs text-muted-foreground">
           Est. power: {Math.floor(payload[0]?.value * 1.2 + 10)} kW
@@ -71,7 +72,7 @@ function CustomTooltip({ active, payload, label }: ChartTooltipProps) {
 }
 
 export function UtilizationChart() {
-  const { utilizationHistory, coolingUnits, timeRange, setTimeRange } = useHVACStore();
+  const { utilizationHistory, coolingUnits, timeRange, setTimeRange, kpis } = useHVACStore();
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
 
   const chartData = useMemo(() => {
@@ -193,7 +194,7 @@ export function UtilizationChart() {
                 domain={[0, 100]}
                 tickFormatter={(v) => `${v}%`}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip activeZones={kpis.totalActiveRooms} />} />
               <Legend 
                 verticalAlign="top" 
                 height={36}

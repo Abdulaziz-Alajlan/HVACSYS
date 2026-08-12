@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -48,7 +48,7 @@ export default function DashboardPage() {
   // Run simulation tick
   useEffect(() => {
     if (!simulationRunning) return;
-    
+
     const interval = setInterval(() => {
       runSimulationTick();
     }, 3000);
@@ -56,9 +56,18 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [simulationRunning, runSimulationTick]);
 
-  const lastUpdatedText = lastUpdated 
+  // This page prerenders as static HTML (no dynamic APIs used), so the
+  // server-rendered "Updated X ago" text is frozen at build/prerender time —
+  // computing it again on the client during hydration mismatches whatever
+  // "now" was then. Same mounted-gate pattern as kpi-cards.tsx.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const lastUpdatedText = mounted && lastUpdated
     ? formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })
-    : 'Never';
+    : '—';
 
   return (
     <div className="min-h-screen bg-background">

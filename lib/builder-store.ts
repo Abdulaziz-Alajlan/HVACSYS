@@ -14,7 +14,8 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import { toast } from 'sonner';
-import { api, type ApiScenario } from './api';
+import { api, type ApiScenario, type ApiZone } from './api';
+import { computeComfortScore, computeIssueFlags, deriveCoolingStatus } from './zone-derived';
 
 // Node data types
 export interface CoolingUnitNodeData extends Record<string, unknown> {
@@ -115,7 +116,7 @@ interface BuilderState {
   loadLayout: () => void;
 
   // Backend-integration actions (Day 4)
-  syncZoneMapping: (zones: { id: number; name: string }[]) => void;
+  syncZoneMapping: (zones: ApiZone[]) => Promise<void>;
   runAIOptimize: (nodeId: string) => Promise<void>;
   runAIOptimizeAll: () => Promise<void>;
   applyRecommendation: (nodeId: string) => Promise<void>;
@@ -516,17 +517,68 @@ export const useBuilderStore = create<BuilderState>()(
         console.log('Layout loaded');
       },
 
-      syncZoneMapping: (zones) => {
+      syncZoneMapping: async (zones) => {
         // Also clears aiLoading: a request in flight when the page reloads
         // would otherwise leave a stuck spinner, since persist saves node
         // data (including aiLoading) to localStorage.
-        set({
-          nodes: get().nodes.map((n) => {
-            if (n.data.type !== 'room') return n;
-            const match = zones.find((z) => z.name === (n.data as RoomNodeData).name);
-            return { ...n, data: { ...n.data, zoneId: match?.id, aiLoading: false } as HVACNodeData };
-          }),
-        });
+        //
+        // Pulls each matched room's *real* currentTemp/targetTemp/occupancy/
+        // airflow/comfortScore/roomType/status/issues from the backend, not
+        // just zoneId — the default layout's room nodes start out with
+        // random mock values (generateRoomData() randomizes all of these),
+        // so without this the properties panel shows stale/fake values right
+        // next to an AI recommendation reasoning about the real ones. Uses
+        // the same derivation formulas as the dashboard (zone-derived.ts) so
+        // the two surfaces can't drift apart the way targetTemp once did.
+        const roomNodes = get().nodes.filter((n) => n.data.type === 'room');
+        await Promise.all(
+          roomNodes.map(async (node) => {
+            const roomData = node.data as RoomNodeData;
+            const zone = zones.find((z) => z.name === roomData.name);
+            if (!zone) {
+              get().updateNodeData(node.id, { zoneId: undefined, aiLoading: false });
+              return;
+            }
+            try {
+              const readings = await api.getZoneReadings(zone.id, 1);
+              const latest = readings[readings.length - 1];
+              if (!latest) {
+                get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
+                return;
+              }
+              const comfortScore = computeComfortScore(
+                latest.temperature,
+                zone.target_temperature,
+                latest.occupancy,
+                zone.capacity
+              );
+              const issues = computeIssueFlags(
+                latest.temperature,
+                zone.target_temperature,
+                latest.occupancy,
+                zone.capacity,
+                latest.airflow,
+                zone.room_type
+              );
+              get().updateNodeData(node.id, {
+                zoneId: zone.id,
+                aiLoading: false,
+                roomType: zone.room_type as RoomNodeData['roomType'],
+                currentTemp: Math.round(latest.temperature * 10) / 10,
+                targetTemp: zone.target_temperature,
+                occupancy: latest.occupancy,
+                capacity: zone.capacity,
+                airflow: Math.round(latest.airflow),
+                comfortScore: Math.round(comfortScore),
+                status: deriveCoolingStatus(latest.damper_position, latest.occupancy),
+                issues,
+              });
+            } catch (err) {
+              console.error(`Failed to sync live data for ${roomData.name}:`, err);
+              get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
+            }
+          })
+        );
       },
 
       runAIOptimize: async (nodeId) => {
@@ -585,11 +637,25 @@ export const useBuilderStore = create<BuilderState>()(
           const result = await api.applyRecommendation(roomData.aiRecommendation.id);
           if (!isCurrentNodeVersion(nodeId, version)) return; // superseded by a newer request
           const reading = result.new_reading;
+          // target/capacity/roomType are static per zone, so the existing
+          // roomData values are still correct — only the reading changed.
           get().updateNodeData(nodeId, {
             aiLoading: false,
             currentTemp: reading.temperature,
             occupancy: reading.occupancy,
             airflow: reading.airflow,
+            comfortScore: Math.round(
+              computeComfortScore(reading.temperature, roomData.targetTemp, reading.occupancy, roomData.capacity)
+            ),
+            status: deriveCoolingStatus(reading.damper_position, reading.occupancy),
+            issues: computeIssueFlags(
+              reading.temperature,
+              roomData.targetTemp,
+              reading.occupancy,
+              roomData.capacity,
+              reading.airflow,
+              roomData.roomType
+            ),
             aiRecommendation: { ...roomData.aiRecommendation, status: 'applied' },
           });
 
@@ -639,6 +705,18 @@ export const useBuilderStore = create<BuilderState>()(
             currentTemp: reading.temperature,
             occupancy: reading.occupancy,
             airflow: reading.airflow,
+            comfortScore: Math.round(
+              computeComfortScore(reading.temperature, roomData.targetTemp, reading.occupancy, roomData.capacity)
+            ),
+            status: deriveCoolingStatus(reading.damper_position, reading.occupancy),
+            issues: computeIssueFlags(
+              reading.temperature,
+              roomData.targetTemp,
+              reading.occupancy,
+              roomData.capacity,
+              reading.airflow,
+              roomData.roomType
+            ),
           });
 
           const upstreamEdge = get().edges.find((e) => e.target === nodeId);
