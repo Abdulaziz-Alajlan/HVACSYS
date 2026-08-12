@@ -22,8 +22,8 @@ import { fetchLiveZoneBundles, bundleToRoom, computeDemandInsights } from './hva
 // they're still mock-generated, but issues/schedules/recommendations are
 // derived FROM the real rooms (those generators already take rooms as
 // input), so they stay consistent with the real numbers shown elsewhere.
-async function buildLiveState(): Promise<HVACSystemState> {
-  const bundles = await fetchLiveZoneBundles();
+async function buildLiveState(aiEnabled: boolean): Promise<HVACSystemState> {
+  const bundles = await fetchLiveZoneBundles(aiEnabled);
   if (bundles.length === 0) {
     throw new Error('Backend returned no zone data');
   }
@@ -146,7 +146,7 @@ export const useHVACStore = create<HVACStore>()(
         if (state.rooms.length > 0) return;
         const version = ++liveFetchVersion;
         try {
-          const liveState = await buildLiveState();
+          const liveState = await buildLiveState(get().aiOptimizationActive);
           if (version !== liveFetchVersion) return; // superseded by a newer fetch
           set({ ...liveState, aiOptimizationActive: get().aiOptimizationActive });
         } catch (err) {
@@ -158,6 +158,11 @@ export const useHVACStore = create<HVACStore>()(
       
       toggleAIOptimization: () => {
         set(state => ({ aiOptimizationActive: !state.aiOptimizationActive }));
+        // Refetch immediately so the toggle has a visible effect right away
+        // (recommendations start/stop being generated) rather than waiting
+        // for the next manual refresh. refreshData() handles its own
+        // errors/versioning, so this doesn't need to be awaited here.
+        void get().refreshData();
       },
       
       toggleSimulation: () => {
@@ -227,7 +232,7 @@ export const useHVACStore = create<HVACStore>()(
       refreshData: async () => {
         const version = ++liveFetchVersion;
         try {
-          const liveState = await buildLiveState();
+          const liveState = await buildLiveState(get().aiOptimizationActive);
           if (version !== liveFetchVersion) return; // superseded by a newer fetch
           set({ ...liveState, aiOptimizationActive: get().aiOptimizationActive });
         } catch (err) {

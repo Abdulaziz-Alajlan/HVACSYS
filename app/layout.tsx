@@ -8,7 +8,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'ClimateIQ | AI-Driven HVAC Optimization',
+  title: 'AirWise | AI-Driven HVAC Optimization',
   description: 'Smart building HVAC optimization platform with AI-powered zone control, energy analytics, and predictive maintenance',
   generator: 'v0.app',
   icons: {

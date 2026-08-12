@@ -37,7 +37,15 @@ export interface LiveZoneBundle {
   recommendation: ApiRecommendation | null;
 }
 
-export async function fetchLiveZoneBundles(): Promise<LiveZoneBundle[]> {
+/**
+ * `aiEnabled` gates only the optimizer/recommendation call — forecasting
+ * (predictZone) stays on regardless, since a temperature forecast isn't an
+ * "AI control action" the way a damper recommendation is. With AI off, this
+ * is the real baseline: no recommendations are generated at all, so
+ * computeDemandInsights' energySavingsKwh naturally comes out to 0 rather
+ * than being a fabricated "AI disabled" placeholder value.
+ */
+export async function fetchLiveZoneBundles(aiEnabled: boolean): Promise<LiveZoneBundle[]> {
   const zones = await api.getZones();
   const relevant = zones.filter((z) => ZONE_ROOM_META[z.name]);
 
@@ -49,7 +57,7 @@ export async function fetchLiveZoneBundles(): Promise<LiveZoneBundle[]> {
 
       const [prediction, recommendation] = await Promise.all([
         api.predictZone(zone.id).catch(() => null),
-        api.recommendZone(zone.id).catch(() => null),
+        aiEnabled ? api.recommendZone(zone.id).catch(() => null) : Promise.resolve(null),
       ]);
       return { zone, latestReading, history, prediction, recommendation };
     })

@@ -155,7 +155,7 @@ function KPICard({
 }
 
 export function KPICards() {
-  const { kpis, utilizationHistory, rooms, issues } = useHVACStore();
+  const { kpis, utilizationHistory, rooms, issues, aiOptimizationActive } = useHVACStore();
   const [mounted, setMounted] = useState(false);
 
   // Prevent hydration mismatch by only rendering time-based values on client
@@ -205,12 +205,14 @@ export function KPICards() {
         title="Energy Savings"
         value={kpis.estimatedEnergySavings}
         unit="kWh"
-        trend="up"
-        trendValue="+12%"
-        description="Today"
+        description={aiOptimizationActive ? 'vs. baseline, next 30 min' : 'AI optimization disabled'}
         icon={<Leaf className="h-5 w-5" />}
-        variant="success"
-        tooltip="Estimated energy saved today through AI optimization compared to baseline"
+        variant={aiOptimizationActive && kpis.estimatedEnergySavings > 0 ? 'success' : 'default'}
+        tooltip={
+          aiOptimizationActive
+            ? 'Estimated energy saved over the next 30 minutes if all current AI recommendations were applied, vs. leaving dampers unchanged'
+            : 'AI optimization is off, so no recommendations are being generated — turn it on to see estimated savings vs. baseline'
+        }
       />
 
       <KPICard

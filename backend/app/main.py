@@ -5,14 +5,33 @@ from datetime import UTC, datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import Base, engine
+from sqlalchemy import select
+
+from app.database import Base, SessionLocal, engine
 from app.ml import predictor
+from app.models import Zone
 from app.routes import predictions, readings, recommendations, scenarios, zones
+from simulation import seed_database
+
+
+def _seed_if_empty() -> None:
+    """Seeds 30 days of history on first boot against an empty database (e.g.
+    a fresh Railway volume), but never touches an already-seeded/live one —
+    the whole point of a persistent disk is that restarts don't lose data."""
+    db = SessionLocal()
+    try:
+        zone_exists = db.scalars(select(Zone.id).limit(1)).first() is not None
+        if not zone_exists:
+            print("No zones found — seeding initial data...")
+            seed_database.seed()
+    finally:
+        db.close()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _seed_if_empty()
     predictor.warm_up()
     yield
 

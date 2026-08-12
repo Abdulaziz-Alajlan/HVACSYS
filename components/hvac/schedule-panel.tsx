@@ -265,7 +265,7 @@ END:VEVENT`;
 
     const fullIcs = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//ClimateIQ//HVAC Schedules//EN
+PRODID:-//AirWise//HVAC Schedules//EN
 ${icsContent}
 END:VCALENDAR`;
 

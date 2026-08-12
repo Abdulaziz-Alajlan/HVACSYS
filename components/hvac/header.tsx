@@ -36,7 +36,7 @@ export function Header() {
               <Cpu className="h-5 w-5" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-semibold tracking-tight text-foreground">ClimateIQ</span>
+              <span className="text-lg font-semibold tracking-tight text-foreground">AirWise</span>
               <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 HVAC Optimization
               </span>
