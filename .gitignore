@@ -16,3 +16,9 @@ node_modules
 .DS_Store
 
 node_modules
+
+# Python / backend
+backend/hvac.db
+backend/venv/
+backend/**/__pycache__/
+*.pyc
