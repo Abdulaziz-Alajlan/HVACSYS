@@ -22,3 +22,5 @@ backend/hvac.db
 backend/venv/
 backend/**/__pycache__/
 *.pyc
+# Local Netlify folder
+.netlify
