@@ -9,6 +9,7 @@ import argparse
 import time
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -19,16 +20,16 @@ from simulation import occupancy, physics, weather
 class LiveSimulator:
     def __init__(self, db: Session):
         self.db = db
-        self.zones = db.query(Zone).order_by(Zone.id).all()
+        self.zones = db.scalars(select(Zone).order_by(Zone.id)).all()
         self.state: dict[int, dict[str, float]] = {}
 
         for zone in self.zones:
-            last_reading = (
-                db.query(SensorReading)
-                .filter(SensorReading.zone_id == zone.id)
+            last_reading = db.scalars(
+                select(SensorReading)
+                .where(SensorReading.zone_id == zone.id)
                 .order_by(SensorReading.timestamp.desc())
-                .first()
-            )
+                .limit(1)
+            ).first()
             if last_reading is not None:
                 self.state[zone.id] = {
                     "temp": last_reading.temperature,

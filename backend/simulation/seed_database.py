@@ -6,6 +6,7 @@ Run from inside backend/: python -m simulation.seed_database
 import random
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import delete
 from tqdm import tqdm
 
 from app.database import Base, SessionLocal, engine
@@ -50,15 +51,21 @@ ZONE_CONFIGS = [
 DAYS_OF_HISTORY = 30
 STEP_MINUTES = 5
 BATCH_SIZE = 2000
+SEED = 42
 
 
 def seed() -> None:
+    # occupancy.py seeds its own per-zone/time Random() instances deterministically,
+    # but physics.py's noise terms use the global `random` module, so it must be
+    # seeded here too for the whole run to be reproducible.
+    random.seed(SEED)
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
         print("Wiping existing zones/readings for a clean, reproducible seed...")
-        db.query(SensorReading).delete()
-        db.query(Zone).delete()
+        db.execute(delete(SensorReading))
+        db.execute(delete(Zone))
         db.commit()
 
         zones = []

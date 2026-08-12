@@ -6,18 +6,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routes import readings, zones
+from app.ml import predictor
+from app.routes import predictions, readings, zones
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    predictor.warm_up()
     yield
 
 
 app = FastAPI(title="AirWise HVAC API", version="0.1.0", lifespan=lifespan)
 
-cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -28,6 +34,7 @@ app.add_middleware(
 
 app.include_router(zones.router)
 app.include_router(readings.router)
+app.include_router(predictions.router)
 
 
 @app.get("/health")

@@ -30,7 +30,7 @@ class SensorReading(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     zone_id: Mapped[int] = mapped_column(ForeignKey("zones.id"), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     temperature: Mapped[float] = mapped_column(Float, nullable=False)
     humidity: Mapped[float] = mapped_column(Float, nullable=False)
     occupancy: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -45,10 +45,11 @@ class SensorReading(Base):
 
 class Prediction(Base):
     __tablename__ = "predictions"
+    __table_args__ = (Index("ix_predictions_zone_ts", "zone_id", "timestamp"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     zone_id: Mapped[int] = mapped_column(ForeignKey("zones.id"), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     horizon_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     predicted_temperature: Mapped[float] = mapped_column(Float, nullable=False)
     predicted_cooling_demand: Mapped[float] = mapped_column(Float, nullable=False)
@@ -58,10 +59,11 @@ class Prediction(Base):
 
 class Recommendation(Base):
     __tablename__ = "recommendations"
+    __table_args__ = (Index("ix_recommendations_zone_ts", "zone_id", "timestamp"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     zone_id: Mapped[int] = mapped_column(ForeignKey("zones.id"), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     action: Mapped[str] = mapped_column(String, nullable=False)
     current_airflow: Mapped[float] = mapped_column(Float, nullable=False)
     recommended_airflow: Mapped[float] = mapped_column(Float, nullable=False)

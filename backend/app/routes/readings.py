@@ -17,9 +17,13 @@ def create_reading(payload: SensorReadingCreate, db: Session = Depends(get_db)):
     if zone is None:
         raise HTTPException(status_code=404, detail="Zone not found")
 
+    timestamp = payload.timestamp or datetime.now(UTC)
+    if timestamp.tzinfo is not None:
+        timestamp = timestamp.astimezone(UTC).replace(tzinfo=None)
+
     reading = SensorReading(
         **payload.model_dump(exclude={"timestamp"}),
-        timestamp=payload.timestamp or datetime.now(UTC).replace(tzinfo=None),
+        timestamp=timestamp,
     )
     db.add(reading)
     db.commit()

@@ -41,3 +41,16 @@ class SensorReadingOut(SensorReadingBase):
     id: int
     zone_id: int
     timestamp: datetime
+
+
+class PredictionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    zone_id: int
+    timestamp: datetime
+    horizon_minutes: int
+    predicted_temperature: float
+    predicted_cooling_demand: float
+    confidence: float
+    model_version: str
