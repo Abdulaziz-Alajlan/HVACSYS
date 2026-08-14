@@ -87,14 +87,14 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
                   <Thermometer className="h-4 w-4 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">Current</span>
                 </div>
-                <p className="mt-1 text-xl font-bold text-foreground">{room.currentTemp}°C</p>
+                <p className="mt-1 text-xl font-bold text-foreground">{room.currentTemp.toFixed(1)}°C</p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3">
                 <div className="flex items-center gap-2">
                   <TrendingDown className="h-4 w-4 text-accent" />
                   <span className="text-xs text-muted-foreground">Target</span>
                 </div>
-                <p className="mt-1 text-xl font-bold text-foreground">{room.targetTemp}°C</p>
+                <p className="mt-1 text-xl font-bold text-foreground">{room.targetTemp.toFixed(1)}°C</p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3">
                 <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
                   )}
                   <span className="text-xs text-muted-foreground">Predicted</span>
                 </div>
-                <p className="mt-1 text-xl font-bold text-foreground">{room.predictedTemp}°C</p>
+                <p className="mt-1 text-xl font-bold text-foreground">{room.predictedTemp.toFixed(1)}°C</p>
               </div>
             </div>
 

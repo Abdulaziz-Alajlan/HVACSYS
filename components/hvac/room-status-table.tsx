@@ -189,7 +189,7 @@ export function RoomStatusTable() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[120px]">
+                  <TableHead className="w-[120px] pl-6">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -239,7 +239,7 @@ export function RoomStatusTable() {
                   </TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead className="w-[100px]">Next Action</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[50px] pr-6"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -285,7 +285,7 @@ export function RoomStatusTable() {
                       role="button"
                       aria-label={`View details for ${room.name}`}
                     >
-                      <TableCell className="font-medium">
+                      <TableCell className="pl-6 font-medium">
                         <div className="flex items-center gap-2">
                           <span>{room.name}</span>
                           {room.issueFlags.length > 0 && (
@@ -315,12 +315,12 @@ export function RoomStatusTable() {
                             'text-sm font-medium',
                             tempDelta > 2 ? 'text-destructive' : tempDelta < -1 ? 'text-accent' : ''
                           )}>
-                            {room.currentTemp}°C
+                            {room.currentTemp.toFixed(1)}°C
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {room.targetTemp}°C
+                        {room.targetTemp.toFixed(1)}°C
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5">
@@ -355,7 +355,7 @@ export function RoomStatusTable() {
                          room.coolingStatus === 'Inactive Cooling' ? 'Standby' :
                          'Maintain'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="pr-6">
                         {/* Decorative only — the whole row is the real,
                             keyboard-operable control (see tabIndex/role/
                             onKeyDown above); this chevron doesn't need its

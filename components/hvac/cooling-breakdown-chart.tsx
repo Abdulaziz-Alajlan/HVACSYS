@@ -44,11 +44,11 @@ function CustomTooltip({ active, payload }: TooltipProps) {
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Current Temp</span>
-          <span className="font-medium text-foreground">{data.currentTemp}°C</span>
+          <span className="font-medium text-foreground">{data.currentTemp.toFixed(1)}°C</span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Target Temp</span>
-          <span className="font-medium text-foreground">{data.targetTemp}°C</span>
+          <span className="font-medium text-foreground">{data.targetTemp.toFixed(1)}°C</span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Occupancy</span>
