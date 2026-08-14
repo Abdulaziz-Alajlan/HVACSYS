@@ -132,6 +132,54 @@ export function bundleToRecommendation(bundle: LiveZoneBundle): LiveRecommendati
   };
 }
 
+/** Real load (0-100, airflow/max_airflow of its assigned real zones) per mock
+ * cooling-unit id (cu-1..cu-4) and real openness/airflow per mock damper id
+ * (damper-1..damper-6), using the same ZONE_ROOM_META mapping bundleToRoom
+ * uses. CoolingUnit/Damper are still mock *entities* (no backend model for
+ * the equipment itself), but the one numeric field actually driving displayed
+ * load/openness — and the AI Insights card's "N units running high load"
+ * count — no longer has to be Math.random(); it's the real average
+ * utilization of whichever zones that unit/damper actually serves. Other
+ * CoolingUnit/Damper fields (efficiency, healthScore, maintenanceDueDate,
+ * actuatorStatus, ...) stay synthetic since no backend data exists for them
+ * at all — this only replaces the fields with a real equivalent, not the
+ * synthetic entities themselves. */
+export function computeCoolingUnitLoads(bundles: LiveZoneBundle[]): Record<string, number> {
+  const byUnit = new Map<string, number[]>();
+  for (const bundle of bundles) {
+    const meta = ZONE_ROOM_META[bundle.zone.name];
+    if (!meta) continue;
+    const util =
+      bundle.zone.max_airflow > 0 ? (bundle.latestReading.airflow / bundle.zone.max_airflow) * 100 : 0;
+    const list = byUnit.get(meta.unit) ?? [];
+    list.push(Math.min(100, Math.max(0, util)));
+    byUnit.set(meta.unit, list);
+  }
+  return Object.fromEntries(
+    [...byUnit.entries()].map(([unit, utils]) => [unit, Math.round(utils.reduce((s, v) => s + v, 0) / utils.length)])
+  );
+}
+
+export function computeDamperReadings(bundles: LiveZoneBundle[]): Record<string, { openness: number; airflow: number }> {
+  const byDamper = new Map<string, { openness: number; airflow: number }[]>();
+  for (const bundle of bundles) {
+    const meta = ZONE_ROOM_META[bundle.zone.name];
+    if (!meta) continue;
+    const list = byDamper.get(meta.damper) ?? [];
+    list.push({ openness: bundle.latestReading.damper_position, airflow: bundle.latestReading.airflow });
+    byDamper.set(meta.damper, list);
+  }
+  return Object.fromEntries(
+    [...byDamper.entries()].map(([damper, readings]) => [
+      damper,
+      {
+        openness: Math.round(readings.reduce((s, r) => s + r.openness, 0) / readings.length),
+        airflow: Math.round(readings.reduce((s, r) => s + r.airflow, 0) / readings.length),
+      },
+    ])
+  );
+}
+
 /** Real per-zone cooling-capacity utilization at the current moment, 0-100.
  * Replaces the mock coolingUnits' `load` field for the live "Cooling Load"
  * KPI — mirrors the same airflow/max_airflow ratio used in

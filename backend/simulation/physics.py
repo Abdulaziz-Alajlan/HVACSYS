@@ -8,10 +8,24 @@ than independently randomized per field.
 import random
 
 Q_PERSON_KW = 0.12  # sensible heat gain per occupant (ASHRAE light-office figure)
-EQUIPMENT_HEAT_LOAD_KW = {"server-room": 3.0}  # constant IT heat load by room type
-UA_PER_M2 = 0.03  # envelope conductance, kW/°C per m²
+EQUIPMENT_HEAT_LOAD_KW = {"server-room": 2.0}  # constant IT heat load by room type
+UA_PER_M2 = 0.022  # envelope conductance, kW/°C per m² (tightened from 0.03 — see note below)
 THERMAL_MASS_PER_M2 = 200.0  # thermal capacitance, kJ/°C per m²
-SUPPLY_AIR_TEMP_C = 13.0  # AHU cold supply air temperature
+SUPPLY_AIR_TEMP_C = 11.0  # AHU cold supply air temperature (was 13.0 — see note below)
+
+# UA_PER_M2/SUPPLY_AIR_TEMP_C/EQUIPMENT_HEAT_LOAD_KW and every zone's airflow
+# rating (seed_database.py's ZONE_CONFIGS) were retuned together: the original
+# values gave every zone less cooling capacity than its own worst-case heat
+# gain (envelope + occupancy + equipment) even at 100% damper on a plausible
+# hot afternoon — confirmed by direct simulation, not estimation — so every
+# zone latched permanently at max damper regardless of actual conditions.
+# That's what made the optimizer's recommendation look identical no matter
+# when you asked: the "current state" input never actually varied. The
+# retuned constants leave a real (if sometimes tight) margin, so damper
+# position now settles at different equilibria per zone/time/weather instead
+# of pinning at the ceiling — verified by simulating the closed loop
+# (compute_damper_response -> step_temperature) forward several hours per
+# zone under hot/typical/mild conditions before committing to these numbers.
 AIR_DENSITY = 1.2  # kg/m³
 AIR_CP = 1.005  # kJ/(kg·K)
 CFM_TO_M3S = 0.000471947

@@ -19,6 +19,8 @@ import {
   computeDemandInsights,
   computeCoolingLoadPercentage,
   computeUtilizationHistory,
+  computeCoolingUnitLoads,
+  computeDamperReadings,
 } from './hvac-live-data';
 import { computeComfortScore, computeIssueFlags, deriveCoolingStatus } from './zone-derived';
 import { api } from './api';
@@ -38,8 +40,25 @@ async function buildLiveState(aiEnabled: boolean): Promise<HVACSystemState> {
   }
 
   const rooms = bundles.map(bundleToRoom);
-  const coolingUnits = generateCoolingUnits();
-  const dampers = generateDampers(coolingUnits);
+
+  // CoolingUnit/Damper are still mock entities (no backend model exists for
+  // the equipment itself), but their `load`/`openness`/`airflowEstimate` —
+  // the numbers actually shown on the AI Insights card's "N units high load"
+  // count and the damper node's readout — are overwritten with the real
+  // average utilization of whichever real zones each one serves, via the
+  // same ZONE_ROOM_META mapping the rooms themselves use. Everything else
+  // about these entities (efficiency, healthScore, maintenance dates, ...)
+  // stays synthetic since no backend data exists for it at all.
+  const unitLoads = computeCoolingUnitLoads(bundles);
+  const damperReadings = computeDamperReadings(bundles);
+  const coolingUnits = generateCoolingUnits().map((u) =>
+    unitLoads[u.id] !== undefined ? { ...u, load: unitLoads[u.id] } : u
+  );
+  const dampers = generateDampers(coolingUnits).map((d) =>
+    damperReadings[d.id]
+      ? { ...d, openness: damperReadings[d.id].openness, airflowEstimate: damperReadings[d.id].airflow }
+      : d
+  );
   const schedules = generateSchedules(rooms);
   const issues = generateIssues(coolingUnits, dampers, rooms);
   const maintenanceEvents = generateMaintenanceEvents(coolingUnits);

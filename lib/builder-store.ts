@@ -600,6 +600,23 @@ export const useBuilderStore = create<BuilderState>()(
                   status: deriveCoolingStatus(latest.damper_position, latest.occupancy),
                   issues,
                 });
+
+                // The upstream damper node otherwise keeps generateDamperData()'s
+                // random openness/airflow until the user happens to Apply a
+                // recommendation or trigger a scenario for this room (the only
+                // other places that patch it, both further down this file) — so
+                // a freshly-loaded canvas showed a fake damper reading right next
+                // to the room's now-real one. Sync it here too, same edge lookup.
+                const upstreamEdge = get().edges.find((e) => e.target === node.id);
+                const damperNode = upstreamEdge
+                  ? get().nodes.find((n) => n.id === upstreamEdge.source && n.data.type === 'damper')
+                  : undefined;
+                if (damperNode) {
+                  get().updateNodeData(damperNode.id, {
+                    openness: Math.round(latest.damper_position),
+                    airflow: Math.round(latest.airflow),
+                  });
+                }
               } catch (err) {
                 console.error(`Failed to sync live data for ${roomData.name}:`, err);
                 get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });

@@ -16,35 +16,35 @@ from simulation import occupancy, physics, weather
 ZONE_CONFIGS = [
     {
         "name": "A-101", "floor": 1, "room_type": "office", "area": 28,
-        "capacity": 12, "target_temperature": 22.0, "min_airflow": 150, "max_airflow": 900,
+        "capacity": 12, "target_temperature": 22.0, "min_airflow": 225, "max_airflow": 1350,
     },
     {
         "name": "A-102", "floor": 1, "room_type": "meeting-room", "area": 40,
-        "capacity": 20, "target_temperature": 21.5, "min_airflow": 200, "max_airflow": 1200,
+        "capacity": 20, "target_temperature": 21.5, "min_airflow": 300, "max_airflow": 1800,
     },
     {
         "name": "A-104", "floor": 1, "room_type": "executive-office", "area": 18,
-        "capacity": 4, "target_temperature": 21.0, "min_airflow": 100, "max_airflow": 500,
+        "capacity": 4, "target_temperature": 21.0, "min_airflow": 150, "max_airflow": 750,
     },
     {
         "name": "B-201", "floor": 2, "room_type": "lab", "area": 55,
-        "capacity": 15, "target_temperature": 20.5, "min_airflow": 300, "max_airflow": 1600,
+        "capacity": 15, "target_temperature": 20.5, "min_airflow": 450, "max_airflow": 2400,
     },
     {
         "name": "B-202", "floor": 2, "room_type": "classroom", "area": 70,
-        "capacity": 30, "target_temperature": 22.0, "min_airflow": 300, "max_airflow": 1800,
+        "capacity": 30, "target_temperature": 22.0, "min_airflow": 450, "max_airflow": 2700,
     },
     {
         "name": "C-301", "floor": 3, "room_type": "server-room", "area": 20,
-        "capacity": 2, "target_temperature": 18.0, "min_airflow": 400, "max_airflow": 1200,
+        "capacity": 2, "target_temperature": 18.0, "min_airflow": 600, "max_airflow": 1800,
     },
     {
         "name": "D-401", "floor": 4, "room_type": "lobby", "area": 90,
-        "capacity": 50, "target_temperature": 23.0, "min_airflow": 250, "max_airflow": 2000,
+        "capacity": 50, "target_temperature": 23.0, "min_airflow": 375, "max_airflow": 3000,
     },
     {
         "name": "D-403", "floor": 4, "room_type": "office", "area": 24,
-        "capacity": 10, "target_temperature": 22.0, "min_airflow": 150, "max_airflow": 800,
+        "capacity": 10, "target_temperature": 22.0, "min_airflow": 225, "max_airflow": 1200,
     },
 ]
 
