@@ -7,7 +7,6 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useHVACStore } from '@/lib/hvac-store';
@@ -105,61 +104,75 @@ export function CoolingBreakdownChart() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="relative h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={2}
-                dataKey="value"
-                onMouseEnter={(_, index) => {
-                  setHighlightedRoom(chartData[index].id);
-                }}
-                onMouseLeave={() => {
-                  setHighlightedRoom(null);
-                }}
-                onClick={(_, index) => {
-                  setHighlightedRoom(chartData[index].id);
-                }}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={COLORS[index % COLORS.length]}
-                    stroke="hsl(var(--background))"
-                    strokeWidth={2}
-                    className="cursor-pointer transition-opacity hover:opacity-80"
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                layout="vertical"
-                align="right"
-                verticalAlign="middle"
-                iconType="circle"
-                iconSize={8}
-                wrapperStyle={{ fontSize: '11px' }}
-                formatter={(value: string) => (
-                  <span className="text-xs text-muted-foreground">{value}</span>
-                )}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          
-          {/* Center text */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground">
-                {chartData.length}
-              </p>
-              <p className="text-xs text-muted-foreground">Active</p>
+        <div className="flex items-center gap-4">
+          {/* Chart occupies its own fixed box so the ring (and the
+              absolutely-centered text below) stays centered on itself
+              regardless of how much space the legend list next to it
+              takes up — Recharts' own <Legend> shares the drawing area
+              with the Pie, which pushes the ring off-center. */}
+          <div className="relative h-[220px] w-[220px] shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={2}
+                  dataKey="value"
+                  onMouseEnter={(_, index) => {
+                    setHighlightedRoom(chartData[index].id);
+                  }}
+                  onMouseLeave={() => {
+                    setHighlightedRoom(null);
+                  }}
+                  onClick={(_, index) => {
+                    setHighlightedRoom(chartData[index].id);
+                  }}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                      stroke="hsl(var(--background))"
+                      strokeWidth={2}
+                      className="cursor-pointer transition-opacity hover:opacity-80"
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Center text */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground">
+                  {chartData.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Active</p>
+              </div>
             </div>
           </div>
+
+          <ul className="min-w-0 flex-1 space-y-1.5">
+            {chartData.map((entry, index) => (
+              <li
+                key={entry.id}
+                className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground transition-opacity hover:opacity-80"
+                onMouseEnter={() => setHighlightedRoom(entry.id)}
+                onMouseLeave={() => setHighlightedRoom(null)}
+                onClick={() => setHighlightedRoom(entry.id)}
+              >
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                />
+                <span className="truncate">{entry.name}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* Summary */}
