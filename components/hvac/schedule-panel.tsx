@@ -435,7 +435,7 @@ END:VCALENDAR`;
         </CardHeader>
         <CardContent className="pt-0">
           <Tabs defaultValue="active">
-            <TabsList className="grid h-8 w-full grid-cols-2">
+            <TabsList className="grid h-8 w-full max-w-xs grid-cols-2">
               <TabsTrigger value="active" className="text-xs">
                 Active
                 {activeSchedules.length > 0 && (
@@ -455,7 +455,7 @@ END:VCALENDAR`;
             </TabsList>
 
             <ScrollArea className="mt-4 h-[280px] pr-4">
-              <TabsContent value="active" className="m-0 space-y-3">
+              <TabsContent value="active" className="m-0">
                 {activeSchedules.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Calendar className="h-8 w-8 text-muted-foreground" />
@@ -463,17 +463,19 @@ END:VCALENDAR`;
                     <p className="text-xs text-muted-foreground">Create a schedule to get started</p>
                   </div>
                 ) : (
-                  activeSchedules.map(schedule => (
-                    <ScheduleItem 
-                      key={schedule.id} 
-                      schedule={schedule}
-                      onDelete={() => removeSchedule(schedule.id)}
-                    />
-                  ))
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {activeSchedules.map(schedule => (
+                      <ScheduleItem
+                        key={schedule.id}
+                        schedule={schedule}
+                        onDelete={() => removeSchedule(schedule.id)}
+                      />
+                    ))}
+                  </div>
                 )}
               </TabsContent>
 
-              <TabsContent value="upcoming" className="m-0 space-y-3">
+              <TabsContent value="upcoming" className="m-0">
                 {upcomingSchedules.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Clock className="h-8 w-8 text-muted-foreground" />
@@ -481,13 +483,15 @@ END:VCALENDAR`;
                     <p className="text-xs text-muted-foreground">Future schedules will appear here</p>
                   </div>
                 ) : (
-                  upcomingSchedules.map(schedule => (
-                    <ScheduleItem 
-                      key={schedule.id} 
-                      schedule={schedule}
-                      onDelete={() => removeSchedule(schedule.id)}
-                    />
-                  ))
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {upcomingSchedules.map(schedule => (
+                      <ScheduleItem
+                        key={schedule.id}
+                        schedule={schedule}
+                        onDelete={() => removeSchedule(schedule.id)}
+                      />
+                    ))}
+                  </div>
                 )}
               </TabsContent>
             </ScrollArea>

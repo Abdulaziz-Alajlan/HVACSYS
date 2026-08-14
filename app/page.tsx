@@ -208,9 +208,16 @@ export default function DashboardPage() {
           <div className="min-w-0 space-y-6">
             <AIInsightsCard />
             <IssuesPanel />
-            <SchedulePanel />
           </div>
         </div>
+
+        {/* Schedule Management gets its own full-width row rather than
+            stacking in the right column above — that column is much
+            shorter than the left (charts + table), so it left Schedule
+            Management stranded with a lot of empty space beneath it. */}
+        <section className="mt-6">
+          <SchedulePanel />
+        </section>
       </main>
     </div>
   );
