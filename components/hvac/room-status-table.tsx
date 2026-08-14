@@ -194,7 +194,7 @@ export function RoomStatusTable() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSort('name')}
-                      className="-ml-3 h-8 gap-1 text-xs font-medium"
+                      className="-ml-2.5 h-8 gap-1 text-xs font-medium"
                     >
                       Room
                       <ArrowUpDown className="h-3 w-3" />
@@ -206,7 +206,7 @@ export function RoomStatusTable() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSort('currentTemp')}
-                      className="-ml-3 h-8 gap-1 text-xs font-medium"
+                      className="-ml-2.5 h-8 gap-1 text-xs font-medium"
                     >
                       Temp
                       <ArrowUpDown className="h-3 w-3" />
@@ -218,7 +218,7 @@ export function RoomStatusTable() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSort('occupancyCount')}
-                      className="-ml-3 h-8 gap-1 text-xs font-medium"
+                      className="-ml-2.5 h-8 gap-1 text-xs font-medium"
                     >
                       Occup.
                       <ArrowUpDown className="h-3 w-3" />
@@ -231,7 +231,7 @@ export function RoomStatusTable() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleSort('comfortScore')}
-                      className="-ml-3 h-8 gap-1 text-xs font-medium"
+                      className="-ml-2.5 h-8 gap-1 text-xs font-medium"
                     >
                       Comfort
                       <ArrowUpDown className="h-3 w-3" />
