@@ -165,7 +165,7 @@ export function BuilderCanvas() {
         }
       }}
       className={cn(
-        "flex-1 relative",
+        "min-w-0 flex-1 relative",
         isOver && "ring-2 ring-primary ring-inset"
       )}
     >

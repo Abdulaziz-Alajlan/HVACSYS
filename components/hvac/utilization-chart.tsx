@@ -110,8 +110,8 @@ export function UtilizationChart() {
   , chartData[0]);
 
   return (
-    <Card className="col-span-2 lg:col-span-1">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+    <Card className="col-span-2 min-w-0 lg:col-span-1">
+      <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base font-semibold">
             Cooling Unit Utilization

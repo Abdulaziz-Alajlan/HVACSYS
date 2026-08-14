@@ -194,7 +194,7 @@ export default function DashboardPage() {
         {/* Main Grid */}
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Charts */}
-          <div className="space-y-6 lg:col-span-2">
+          <div className="min-w-0 space-y-6 lg:col-span-2">
             <div className="grid gap-6 md:grid-cols-2">
               <UtilizationChart />
               <CoolingBreakdownChart />
@@ -205,7 +205,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Right Column - Panels */}
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <AIInsightsCard />
             <IssuesPanel />
             <SchedulePanel />

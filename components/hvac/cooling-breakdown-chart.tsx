@@ -95,7 +95,7 @@ export function CoolingBreakdownChart() {
   const totalActiveShare = chartData.reduce((sum, d) => sum + d.value, 0);
 
   return (
-    <Card className="col-span-2 lg:col-span-1">
+    <Card className="col-span-2 min-w-0 lg:col-span-1">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">
           Cooling Usage Breakdown
