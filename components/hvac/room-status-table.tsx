@@ -186,10 +186,10 @@ export function RoomStatusTable() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[120px] pl-6">
+                  <TableHead className="w-[94px] pl-6">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -200,8 +200,8 @@ export function RoomStatusTable() {
                       <ArrowUpDown className="h-3 w-3" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-[100px]">Type</TableHead>
-                  <TableHead className="w-[90px]">
+                  <TableHead className="w-[80px]">Type</TableHead>
+                  <TableHead className="w-[82px]">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -212,8 +212,8 @@ export function RoomStatusTable() {
                       <ArrowUpDown className="h-3 w-3" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-[80px]">Target</TableHead>
-                  <TableHead className="w-[90px]">
+                  <TableHead className="w-[61px]">Target</TableHead>
+                  <TableHead className="w-[85px]">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -224,9 +224,9 @@ export function RoomStatusTable() {
                       <ArrowUpDown className="h-3 w-3" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-[80px]">Damper</TableHead>
-                  <TableHead className="w-[80px]">Unit</TableHead>
-                  <TableHead className="w-[90px]">
+                  <TableHead className="w-[68px]">Damper</TableHead>
+                  <TableHead className="w-[53px]">Unit</TableHead>
+                  <TableHead className="w-[92px]">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -237,9 +237,9 @@ export function RoomStatusTable() {
                       <ArrowUpDown className="h-3 w-3" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[100px]">Next Action</TableHead>
-                  <TableHead className="w-[50px] pr-6"></TableHead>
+                  <TableHead className="w-[60px]">Status</TableHead>
+                  <TableHead className="w-[88px]">Next Action</TableHead>
+                  <TableHead className="w-[48px] pr-6"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -266,6 +266,11 @@ export function RoomStatusTable() {
                   const comfortBadge = getComfortBadge(room.comfortScore);
                   const isHighlighted = room.id === highlightedRoomId;
                   const tempDelta = room.currentTemp - room.targetTemp;
+                  const nextAction =
+                    room.coolingStatus === 'Starting in 10 Minutes' ? 'Start cooling' :
+                    room.coolingStatus === 'Expected to Start in a Bit' ? 'Pre-cool' :
+                    room.coolingStatus === 'Inactive Cooling' ? 'Standby' :
+                    'Maintain';
 
                   return (
                     <TableRow
@@ -287,7 +292,7 @@ export function RoomStatusTable() {
                     >
                       <TableCell className="pl-6 font-medium">
                         <div className="flex items-center gap-2">
-                          <span>{room.name}</span>
+                          <span className="truncate" title={room.name}>{room.name}</span>
                           {room.issueFlags.length > 0 && (
                             <TooltipProvider>
                               <Tooltip>
@@ -302,7 +307,7 @@ export function RoomStatusTable() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="truncate text-xs text-muted-foreground" title={roomTypeLabels[room.roomType]}>
                         {roomTypeLabels[room.roomType]}
                       </TableCell>
                       <TableCell>
@@ -345,15 +350,16 @@ export function RoomStatusTable() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={cn('text-[10px]', statusConfig.className)}>
+                        <Badge
+                          variant="outline"
+                          className={cn('max-w-full truncate text-[10px]', statusConfig.className)}
+                          title={statusConfig.label}
+                        >
                           {statusConfig.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {room.coolingStatus === 'Starting in 10 Minutes' ? 'Start cooling' :
-                         room.coolingStatus === 'Expected to Start in a Bit' ? 'Pre-cool' :
-                         room.coolingStatus === 'Inactive Cooling' ? 'Standby' :
-                         'Maintain'}
+                      <TableCell className="truncate text-xs text-muted-foreground" title={nextAction}>
+                        {nextAction}
                       </TableCell>
                       <TableCell className="pr-6">
                         {/* Decorative only — the whole row is the real,
