@@ -2,10 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  Cpu, 
-  LayoutDashboard, 
-  Map, 
+import {
+  LayoutDashboard,
+  Map,
   Settings,
   Bell,
   Sparkles,
@@ -32,9 +31,11 @@ export function Header() {
         {/* Logo & Brand */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Cpu className="h-5 w-5" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- next/image
+                brings no benefit here since next.config.mjs sets
+                images.unoptimized, and no other component in this repo uses
+                next/image either. */}
+            <img src="/logo-180.png" alt="" className="h-9 w-9" />
             <div className="flex flex-col">
               <span className="text-lg font-semibold tracking-tight text-foreground">AirWise</span>
               <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">

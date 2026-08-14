@@ -3,47 +3,56 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Dark industrial SaaS theme for HVAC optimization platform */
+/* "Blueprint" theme for HVAC optimization platform — grounded in
+   engineering-drawing HVAC vernacular (ductwork blueprints, psychrometric
+   charts, copper piping) rather than the generic near-black/neon-cyan
+   AI-dashboard default. True ink-navy neutrals, copper as the warm
+   counterpoint. Primary blue (#4b98c5) is sampled directly from the real
+   AirWise logo's wave-icon gradient (averaged across its lightest/darkest
+   points), not invented — background/card stay deliberately less saturated
+   than the logo's navy circle (same ~211-215° hue, just desaturated) since a
+   full-page background needs to recede, not compete with everything on top
+   of it. */
 :root {
-  --background: oklch(0.098 0.005 260);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.13 0.008 260);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.13 0.008 260);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.65 0.18 220);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.18 0.01 260);
-  --secondary-foreground: oklch(0.9 0 0);
-  --muted: oklch(0.2 0.01 260);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.55 0.2 165);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.22 0.01 260);
-  --input: oklch(0.18 0.01 260);
-  --ring: oklch(0.65 0.18 220);
-  --chart-1: oklch(0.65 0.18 220);
-  --chart-2: oklch(0.55 0.2 165);
-  --chart-3: oklch(0.7 0.18 80);
-  --chart-4: oklch(0.6 0.2 300);
-  --chart-5: oklch(0.65 0.2 30);
+  --background: #0f141b;
+  --foreground: #e4eaef;
+  --card: #161d26;
+  --card-foreground: #e4eaef;
+  --popover: #161d26;
+  --popover-foreground: #e4eaef;
+  --primary: #4b98c5;
+  --primary-foreground: #f5f8fa;
+  --secondary: #1c2530;
+  --secondary-foreground: #c9d2da;
+  --muted: #212b37;
+  --muted-foreground: #7c8a98;
+  --accent: #7ca88c;
+  --accent-foreground: #f2f7f4;
+  --destructive: #c15b4e;
+  --destructive-foreground: #fbeeec;
+  --border: #29323f;
+  --input: #1c2530;
+  --ring: #4b98c5;
+  --chart-1: #4b98c5;
+  --chart-2: #bd7440;
+  --chart-3: #7ca88c;
+  --chart-4: #c79a4b;
+  --chart-5: #6f8494;
   --radius: 0.625rem;
-  --sidebar: oklch(0.11 0.008 260);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.65 0.18 220);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.18 0.01 260);
-  --sidebar-accent-foreground: oklch(0.9 0 0);
-  --sidebar-border: oklch(0.22 0.01 260);
-  --sidebar-ring: oklch(0.65 0.18 220);
-  
+  --sidebar: #10161d;
+  --sidebar-foreground: #e4eaef;
+  --sidebar-primary: #4b98c5;
+  --sidebar-primary-foreground: #f5f8fa;
+  --sidebar-accent: #1c2530;
+  --sidebar-accent-foreground: #c9d2da;
+  --sidebar-border: #29323f;
+  --sidebar-ring: #4b98c5;
+
   /* Custom status colors */
-  --success: oklch(0.55 0.2 165);
-  --warning: oklch(0.7 0.18 80);
-  --info: oklch(0.65 0.18 220);
-  --critical: oklch(0.55 0.22 25);
+  --success: #7ca88c;
+  --warning: #c79a4b;
+  --info: #4b98c5;
+  --critical: #c15b4e;
 }
 
 @theme inline {
@@ -107,33 +116,33 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: oklch(0.12 0.005 260);
+  background: #141a22;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.25 0.01 260);
+  background: #29323f;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.3 0.01 260);
+  background: #334051;
 }
 
 /* Subtle glow effects */
 .glow-primary {
-  box-shadow: 0 0 20px -5px oklch(0.65 0.18 220 / 0.3);
+  box-shadow: 0 0 20px -5px rgba(91, 150, 176, 0.3);
 }
 
 .glow-accent {
-  box-shadow: 0 0 20px -5px oklch(0.55 0.2 165 / 0.3);
+  box-shadow: 0 0 20px -5px rgba(124, 168, 140, 0.3);
 }
 
 .glow-warning {
-  box-shadow: 0 0 20px -5px oklch(0.7 0.18 80 / 0.3);
+  box-shadow: 0 0 20px -5px rgba(199, 154, 75, 0.3);
 }
 
 .glow-critical {
-  box-shadow: 0 0 20px -5px oklch(0.55 0.22 25 / 0.3);
+  box-shadow: 0 0 20px -5px rgba(193, 91, 78, 0.3);
 }
 
 /* Respects the OS-level motion setting for every animation/transition in the

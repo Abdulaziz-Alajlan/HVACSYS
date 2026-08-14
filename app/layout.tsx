@@ -13,25 +13,15 @@ export const metadata: Metadata = {
   generator: 'v0.app',
   icons: {
     icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
+      { url: '/logo-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo-16.png', sizes: '16x16', type: 'image/png' },
     ],
-    apple: '/apple-icon.png',
+    apple: '/logo-180.png',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a12',
+  themeColor: '#0f141b',
   colorScheme: 'dark',
 }
 
