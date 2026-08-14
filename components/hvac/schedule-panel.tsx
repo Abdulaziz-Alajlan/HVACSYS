@@ -10,6 +10,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -108,14 +119,32 @@ function ScheduleItem({ schedule, onDelete }: { schedule: Schedule; onDelete: ()
           <Badge variant="outline" className="text-[10px]">
             {schedule.targetTemp}°C
           </Badge>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
-            onClick={onDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                aria-label={`Delete schedule for ${room?.name ?? 'this room'}`}
+                title="Delete schedule"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this schedule?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The cooling schedule for {room?.name ?? 'this room'} will be removed. This
+                  can&apos;t be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
       <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
@@ -134,8 +163,8 @@ function ScheduleItem({ schedule, onDelete }: { schedule: Schedule; onDelete: ()
           <div className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
             <span>
-              {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - 
-              {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} -
+              {endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
             </span>
           </div>
         )}
@@ -284,40 +313,82 @@ END:VCALENDAR`;
     });
   };
 
-  const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.ics,.csv';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        // Simulate import
-        toast.success('Calendar imported', {
-          description: `Imported events from ${file.name}`,
-        });
+  // Parses the .ics format handleExport actually produces (BEGIN:VEVENT
+  // blocks with DTSTART/DTEND/SUMMARY/DESCRIPTION) — previously this claimed
+  // success and added one canned schedule regardless of the file's real
+  // contents. Matches SUMMARY's "HVAC Cooling - {room name}" back to a real
+  // room when possible; falls back to the first room otherwise.
+  const parseIcsEvents = (icsText: string): Schedule[] => {
+    const eventBlocks = icsText.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) ?? [];
 
-        // Add a sample imported schedule
-        const importedSchedule: Schedule = {
-          id: `schedule-import-${Date.now()}`,
-          roomId: rooms[0]?.id ?? '',
+    return eventBlocks
+      .map((block, i): Schedule | null => {
+        const dtStart = block.match(/DTSTART:(\d{8}T\d{6})Z?/)?.[1];
+        const dtEnd = block.match(/DTEND:(\d{8}T\d{6})Z?/)?.[1];
+        const summary = block.match(/SUMMARY:(.+)/)?.[1]?.trim();
+        const tempMatch = block.match(/Target temperature:\s*(-?\d+(?:\.\d+)?)/);
+
+        if (!dtStart || !dtEnd) return null;
+
+        const parseIcsDate = (raw: string) => {
+          const year = Number(raw.slice(0, 4));
+          const month = Number(raw.slice(4, 6)) - 1;
+          const day = Number(raw.slice(6, 8));
+          const hour = Number(raw.slice(9, 11));
+          const minute = Number(raw.slice(11, 13));
+          return new Date(Date.UTC(year, month, day, hour, minute));
+        };
+
+        const start = parseIcsDate(dtStart);
+        const end = parseIcsDate(dtEnd);
+        const roomName = summary?.replace(/^HVAC Cooling - /, '');
+        const matchedRoom = roomName ? rooms.find(r => r.name === roomName) : undefined;
+
+        return {
+          id: `schedule-import-${Date.now()}-${i}`,
+          roomId: matchedRoom?.id ?? rooms[0]?.id ?? '',
           scheduleType: 'temporary',
           activeDates: {
-            start: new Date(),
-            end: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+            start,
+            end: new Date(start.getTime() + 24 * 60 * 60 * 1000),
           },
           activeTimes: {
-            start: '10:00',
-            end: '16:00',
+            start: `${String(start.getUTCHours()).padStart(2, '0')}:${String(start.getUTCMinutes()).padStart(2, '0')}`,
+            end: `${String(end.getUTCHours()).padStart(2, '0')}:${String(end.getUTCMinutes()).padStart(2, '0')}`,
           },
-          targetTemp: 21,
+          targetTemp: tempMatch ? parseFloat(tempMatch[1]) : 21,
           recurrenceDays: [],
           priorityLevel: 'medium',
           source: 'imported',
           createdAt: new Date(),
           status: 'Upcoming',
         };
-        addSchedule(importedSchedule);
+      })
+      .filter((s): s is Schedule => s !== null);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.ics';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const imported = parseIcsEvents(text);
+
+      if (imported.length === 0) {
+        toast.error('Import failed', {
+          description: `No valid calendar events found in ${file.name}. Only .ics files exported from this app are supported.`,
+        });
+        return;
       }
+
+      imported.forEach(addSchedule);
+      toast.success('Calendar imported', {
+        description: `Imported ${imported.length} event${imported.length === 1 ? '' : 's'} from ${file.name}`,
+      });
     };
     input.click();
   };

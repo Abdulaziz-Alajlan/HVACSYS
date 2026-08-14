@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/tooltip';
 import {
   Search,
+  X,
   AlertCircle,
   ArrowUpDown,
   Users,
@@ -53,7 +55,7 @@ type SortField = 'name' | 'currentTemp' | 'comfortScore' | 'occupancyCount';
 type SortDirection = 'asc' | 'desc';
 
 export function RoomStatusTable() {
-  const { rooms, coolingUnits, highlightedRoomId, setSelectedRoom, selectedRoomId } = useHVACStore();
+  const { rooms, coolingUnits, highlightedRoomId, setSelectedRoom, selectedRoomId, isInitialLoading } = useHVACStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CoolingStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<RoomType | 'all'>('all');
@@ -141,8 +143,19 @@ export function RoomStatusTable() {
                   placeholder="Search rooms..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="h-8 w-[180px] pl-8 text-xs"
+                  className={cn('h-8 w-[180px] pl-8 text-xs', search && 'pr-7')}
                 />
+                {search && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0.5 top-1/2 h-7 w-7 -translate-y-1/2"
+                    onClick={() => setSearch('')}
+                    aria-label="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                )}
               </div>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as CoolingStatus | 'all')}>
                 <SelectTrigger className="h-8 w-[130px] text-xs">
@@ -230,7 +243,24 @@ export function RoomStatusTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAndSortedRooms.map(room => {
+                {isInitialLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i} aria-busy="true">
+                      <TableCell colSpan={10}>
+                        <Skeleton className="h-6 w-full" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredAndSortedRooms.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="h-24 text-center text-sm text-muted-foreground">
+                      {rooms.length === 0
+                        ? 'No rooms configured for this building.'
+                        : 'No rooms match your search or filters.'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAndSortedRooms.map(room => {
                   const unit = coolingUnits.find(u => u.id === room.assignedCoolingUnit);
                   const statusConfig = coolingStatusConfig[room.coolingStatus];
                   const comfortBadge = getComfortBadge(room.comfortScore);
@@ -241,10 +271,19 @@ export function RoomStatusTable() {
                     <TableRow
                       key={room.id}
                       className={cn(
-                        'cursor-pointer transition-colors',
+                        'cursor-pointer transition-colors focus-visible:bg-primary/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-inset',
                         isHighlighted && 'bg-primary/5'
                       )}
                       onClick={() => setSelectedRoom(room.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedRoom(room.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`View details for ${room.name}`}
                     >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -317,13 +356,16 @@ export function RoomStatusTable() {
                          'Maintain'}
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
+                        {/* Decorative only — the whole row is the real,
+                            keyboard-operable control (see tabIndex/role/
+                            onKeyDown above); this chevron doesn't need its
+                            own focus stop or label. */}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       </TableCell>
                     </TableRow>
                   );
-                })}
+                  })
+                )}
               </TableBody>
             </Table>
           </div>

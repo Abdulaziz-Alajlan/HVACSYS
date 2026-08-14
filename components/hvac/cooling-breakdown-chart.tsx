@@ -12,17 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useHVACStore } from '@/lib/hvac-store';
 import { roomTypeLabels } from '@/lib/hvac-mock-data';
-
-const COLORS = [
-  'hsl(220 80% 65%)',
-  'hsl(165 80% 55%)',
-  'hsl(45 90% 55%)',
-  'hsl(280 70% 60%)',
-  'hsl(0 80% 55%)',
-  'hsl(200 80% 60%)',
-  'hsl(120 60% 50%)',
-  'hsl(30 90% 55%)',
-];
+import { CHART_PALETTE as COLORS } from '@/lib/chart-colors';
 
 interface TooltipProps {
   active?: boolean;

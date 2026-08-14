@@ -122,7 +122,7 @@ export function Header() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications, ${openIssues} open issues`}>
                   <Bell className="h-4 w-4" />
                   {openIssues > 0 && (
                     <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
@@ -138,7 +138,7 @@ export function Header() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" aria-label="Settings">
                   <Settings className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>

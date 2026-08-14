@@ -16,6 +16,17 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Settings2,
   Trash2,
   Copy,
@@ -144,15 +155,27 @@ export function PropertiesPanel() {
             <Copy className="h-3.5 w-3.5 mr-1.5" />
             Duplicate
           </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleDelete}
-            className="flex-1"
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Delete
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="flex-1">
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this node?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  &quot;{String(localData.name || localData.label || "Untitled")}&quot; and any
+                  connections to it will be removed from the canvas. This can&apos;t be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -443,7 +466,10 @@ export function PropertiesPanel() {
 
               {!hasZone && (
                 <p className="text-xs text-muted-foreground">
-                  No matching backend zone for &quot;{roomData.name}&quot; — editing local values only.
+                  No matching backend zone for &quot;{roomData.name}&quot; — editing local values
+                  only, AI Optimize and scenarios are unavailable for this node. Rename it to
+                  match a real zone name (e.g. A-101, B-201) to connect it to live AI features, or
+                  keep it as-is to use this node purely as a freeform design element.
                 </p>
               )}
 

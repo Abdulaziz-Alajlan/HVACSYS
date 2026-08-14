@@ -11,25 +11,26 @@ import {
   generateSchedules,
   generateIssues,
   generateMaintenanceEvents,
-  generateUtilizationHistory,
 } from './hvac-mock-data';
 import {
   fetchLiveZoneBundles,
   bundleToRoom,
   bundleToRecommendation,
   computeDemandInsights,
+  computeCoolingLoadPercentage,
+  computeUtilizationHistory,
 } from './hvac-live-data';
 import { computeComfortScore, computeIssueFlags, deriveCoolingStatus } from './zone-derived';
 import { api } from './api';
 import { toast } from 'sonner';
 
-// Builds a full dashboard state from real backend data: rooms and
-// recommendations come directly from live zones/readings/predictions/
-// recommendations; cooling units, dampers, schedules, and maintenance
-// events have no backend model yet, so they're still mock-generated, but
-// issues/schedules are derived FROM the real rooms (those generators
-// already take rooms as input), so they stay consistent with the real
-// numbers shown elsewhere.
+// Builds a full dashboard state from real backend data: rooms,
+// recommendations, the Cooling Load KPI, and the utilization history all
+// come directly from live zones/readings/predictions/recommendations.
+// Cooling units, dampers, schedules, and maintenance events have no backend
+// model yet, so they're still mock-generated, but issues/schedules are
+// derived FROM the real rooms (those generators already take rooms as
+// input), so they stay consistent with the real numbers shown elsewhere.
 async function buildLiveState(aiEnabled: boolean): Promise<HVACSystemState> {
   const bundles = await fetchLiveZoneBundles(aiEnabled);
   if (bundles.length === 0) {
@@ -45,17 +46,16 @@ async function buildLiveState(aiEnabled: boolean): Promise<HVACSystemState> {
   const recommendations = bundles
     .map(bundleToRecommendation)
     .filter((r): r is NonNullable<typeof r> => r !== null);
-  const utilizationHistory = generateUtilizationHistory();
+  const utilizationHistory = computeUtilizationHistory(bundles);
   const insights = computeDemandInsights(bundles);
 
   const activeRooms = rooms.filter((r) => r.coolingStatus !== 'Inactive Cooling');
   const avgComfort = rooms.reduce((sum, r) => sum + r.comfortScore, 0) / (rooms.length || 1);
-  const totalLoad = coolingUnits.reduce((sum, u) => sum + u.load, 0) / (coolingUnits.length || 1);
 
   const kpis: KPIData = {
     totalActiveRooms: activeRooms.length,
     totalRooms: rooms.length,
-    coolingLoadPercentage: Math.round(totalLoad),
+    coolingLoadPercentage: computeCoolingLoadPercentage(bundles),
     estimatedEnergySavings: insights.energySavingsKwh,
     averageComfortScore: Math.round(avgComfort),
     openIssuesCount: issues.filter((i) => i.status === 'open').length,
@@ -93,6 +93,7 @@ interface HVACStore extends HVACSystemState {
   updateDamper: (id: string, updates: Partial<Damper>) => void;
   acknowledgeIssue: (id: string) => void;
   resolveIssue: (id: string) => void;
+  reopenIssue: (id: string) => void;
   setTimeRange: (range: '1h' | '24h' | '7d') => void;
   refreshData: () => Promise<void>;
   applyRecommendation: (id: number) => Promise<void>;
@@ -103,7 +104,11 @@ interface HVACStore extends HVACSystemState {
   selectedDamperId: string | null;
   timeRange: '1h' | '24h' | '7d';
   highlightedRoomId: string | null;
-  
+  // True only until the first initialize() resolves (success or fallback to
+  // mock). Distinguishes "still loading" from "this building genuinely has
+  // 0 active rooms" — before this flag existed both looked identical.
+  isInitialLoading: boolean;
+
   setSelectedRoom: (id: string | null) => void;
   setSelectedCoolingUnit: (id: string | null) => void;
   setSelectedDamper: (id: string | null) => void;
@@ -151,7 +156,8 @@ export const useHVACStore = create<HVACStore>()(
       selectedDamperId: null,
       timeRange: '24h',
       highlightedRoomId: null,
-      
+      isInitialLoading: true,
+
       // Actions
       initialize: async () => {
         const state = get();
@@ -169,11 +175,12 @@ export const useHVACStore = create<HVACStore>()(
             ...liveState,
             schedules: [...manualSchedules, ...liveState.schedules],
             aiOptimizationActive: get().aiOptimizationActive,
+            isInitialLoading: false,
           });
         } catch (err) {
           if (version !== liveFetchVersion) return;
           console.error('Failed to load live backend data, falling back to mock data:', err);
-          set(generateInitialHVACState());
+          set({ ...generateInitialHVACState(), isInitialLoading: false });
         }
       },
       
@@ -243,6 +250,15 @@ export const useHVACStore = create<HVACStore>()(
       resolveIssue: (id) => {
         set(state => ({
           issues: state.issues.map(i => i.id === id ? { ...i, status: 'resolved' as const } : i),
+        }));
+      },
+
+      // Powers the "Undo" action on the acknowledge/resolve toasts — these
+      // are fire-and-forget status changes with no confirm step, so an undo
+      // path is the lower-friction alternative to a confirm dialog.
+      reopenIssue: (id) => {
+        set(state => ({
+          issues: state.issues.map(i => i.id === id ? { ...i, status: 'open' as const } : i),
         }));
       },
       

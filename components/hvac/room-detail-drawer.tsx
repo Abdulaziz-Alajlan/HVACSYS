@@ -34,6 +34,7 @@ import type { Room } from '@/lib/hvac-types';
 import { useHVACStore } from '@/lib/hvac-store';
 import { roomTypeLabels } from '@/lib/hvac-mock-data';
 import { cn } from '@/lib/utils';
+import { CHART_COLORS } from '@/lib/chart-colors';
 
 interface RoomDetailDrawerProps {
   room: Room | undefined;
@@ -53,7 +54,7 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
   const roomRecommendations = recommendations.filter(r => r.roomId === room.id);
 
   const tempHistory = room.temperatureHistory.slice(-24).map(p => ({
-    time: new Date(p.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    time: new Date(p.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }),
     value: p.value,
     target: room.targetTemp,
   }));
@@ -116,8 +117,8 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
                 <AreaChart data={tempHistory}>
                   <defs>
                     <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(220 80% 65%)" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="hsl(220 80% 65%)" stopOpacity={0} />
+                      <stop offset="0%" stopColor={CHART_COLORS.blue} stopOpacity={0.3} />
+                      <stop offset="100%" stopColor={CHART_COLORS.blue} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis 
@@ -146,7 +147,7 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
                   <Area
                     type="monotone"
                     dataKey="value"
-                    stroke="hsl(220 80% 65%)"
+                    stroke={CHART_COLORS.blue}
                     strokeWidth={1.5}
                     fill="url(#tempGradient)"
                   />

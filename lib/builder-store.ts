@@ -99,6 +99,10 @@ interface BuilderState {
   aiOverlayEnabled: boolean;
   simulationActive: boolean;
   isSyncing: boolean;
+  // True when the initial api.getZones() sync failed (backend unreachable),
+  // so the toolbar can show a persistent signal instead of the user only
+  // discovering it node-by-node via "no matching backend zone".
+  zoneSyncFailed: boolean;
 
   // Actions
   onNodesChange: (changes: NodeChange<HVACNode>[]) => void;
@@ -122,6 +126,7 @@ interface BuilderState {
   loadLayout: () => void;
 
   // Backend-integration actions (Day 4)
+  setZoneSyncFailed: (failed: boolean) => void;
   syncZoneMapping: (zones: ApiZone[]) => Promise<void>;
   runAIOptimize: (nodeId: string) => Promise<void>;
   runAIOptimizeAll: () => Promise<void>;
@@ -396,6 +401,7 @@ export const useBuilderStore = create<BuilderState>()(
       aiOverlayEnabled: false,
       simulationActive: false,
       isSyncing: false,
+      zoneSyncFailed: false,
 
       onNodesChange: (changes) => {
         set({
@@ -533,6 +539,8 @@ export const useBuilderStore = create<BuilderState>()(
         // Layout is auto-loaded via persist middleware
         console.log('Layout loaded');
       },
+
+      setZoneSyncFailed: (failed) => set({ zoneSyncFailed: failed }),
 
       syncZoneMapping: async (zones) => {
         // Also clears aiLoading: a request in flight when the page reloads

@@ -9,7 +9,7 @@
 // that look identical to a viewer.
 
 import { api, type ApiPrediction, type ApiReading, type ApiRecommendation, type ApiZone } from './api';
-import type { LiveRecommendation, Room, RoomType } from './hvac-types';
+import type { LiveRecommendation, Room, RoomType, TimeSeriesPoint } from './hvac-types';
 import { computeComfortScore, computeIssueFlags, deriveCoolingStatus } from './zone-derived';
 
 const HISTORY_LIMIT = 288; // 24h at 5-min intervals
@@ -130,6 +130,70 @@ export function bundleToRecommendation(bundle: LiveZoneBundle): LiveRecommendati
     timestamp: recommendation.timestamp,
     isReal: true,
   };
+}
+
+/** Real per-zone cooling-capacity utilization at the current moment, 0-100.
+ * Replaces the mock coolingUnits' `load` field for the live "Cooling Load"
+ * KPI — mirrors the same airflow/max_airflow ratio used in
+ * computeUtilizationHistory below, just for the single latest reading. */
+export function computeCoolingLoadPercentage(bundles: LiveZoneBundle[]): number {
+  if (bundles.length === 0) return 0;
+  const total = bundles.reduce((sum, b) => {
+    const util = b.zone.max_airflow > 0 ? (b.latestReading.airflow / b.zone.max_airflow) * 100 : 0;
+    return sum + Math.min(100, Math.max(0, util));
+  }, 0);
+  return Math.round(total / bundles.length);
+}
+
+/** Real fleet-wide utilization/efficiency/power series for the Utilization
+ * Chart, built from the same 288-point reading history already fetched per
+ * zone (see fetchLiveZoneBundles) — replaces generateUtilizationHistory()'s
+ * Math.random() output when dataSource is 'live'.
+ *
+ * Zones can have slightly different history lengths (a zone seeded/synced
+ * later has fewer points), so points are aligned from the most recent
+ * reading backwards across zones rather than by absolute index, using
+ * whichever zone has the longest history as the time axis. */
+export function computeUtilizationHistory(bundles: LiveZoneBundle[]): TimeSeriesPoint[] {
+  if (bundles.length === 0) return [];
+
+  const pointCount = Math.min(...bundles.map((b) => b.history.length));
+  if (pointCount === 0) return [];
+  const timeBase = bundles.reduce((longest, b) => (b.history.length > longest.history.length ? b : longest));
+
+  const points: TimeSeriesPoint[] = [];
+  for (let offsetFromEnd = pointCount; offsetFromEnd >= 1; offsetFromEnd--) {
+    let utilizationSum = 0;
+    let comfortSum = 0;
+    let powerSum = 0;
+    let activatedZones = 0;
+
+    for (const bundle of bundles) {
+      const reading = bundle.history[bundle.history.length - offsetFromEnd];
+      const util = bundle.zone.max_airflow > 0 ? (reading.airflow / bundle.zone.max_airflow) * 100 : 0;
+      utilizationSum += Math.min(100, Math.max(0, util));
+      comfortSum += computeComfortScore(
+        reading.temperature,
+        bundle.zone.target_temperature,
+        reading.occupancy,
+        bundle.zone.capacity
+      );
+      // energy_consumption is kWh per 5-min tick; *12 converts to an hourly kW rate.
+      powerSum += reading.energy_consumption * 12;
+      if (reading.damper_position > 0) activatedZones += 1;
+    }
+
+    const timeReading = timeBase.history[timeBase.history.length - offsetFromEnd];
+    points.push({
+      time: new Date(timeReading.timestamp),
+      utilization: Math.round(utilizationSum / bundles.length),
+      efficiency: Math.round(comfortSum / bundles.length),
+      activatedZones,
+      powerUsage: Math.round(powerSum * 10) / 10,
+    });
+  }
+
+  return points;
 }
 
 export interface LiveDemandInsights {

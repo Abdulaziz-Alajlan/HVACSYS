@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { useHVACStore } from '@/lib/hvac-store';
 import { cn } from '@/lib/utils';
+import { CHART_COLORS } from '@/lib/chart-colors';
 
 interface ChartTooltipProps {
   active?: boolean;
@@ -95,6 +96,7 @@ export function UtilizationChart() {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
+        timeZone: 'UTC',
       }),
       utilization: point.utilization,
       efficiency: point.efficiency,
@@ -164,12 +166,12 @@ export function UtilizationChart() {
             <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="utilizationGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(220 80% 65%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(220 80% 65%)" stopOpacity={0} />
+                  <stop offset="0%" stopColor={CHART_COLORS.blue} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={CHART_COLORS.blue} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="efficiencyGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(165 80% 55%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(165 80% 55%)" stopOpacity={0} />
+                  <stop offset="0%" stopColor={CHART_COLORS.green} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={CHART_COLORS.green} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid 
@@ -214,19 +216,19 @@ export function UtilizationChart() {
                 type="monotone"
                 dataKey="utilization"
                 name="Utilization"
-                stroke="hsl(220 80% 65%)"
+                stroke={CHART_COLORS.blue}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, fill: 'hsl(220 80% 65%)' }}
+                activeDot={{ r: 4, fill: CHART_COLORS.blue }}
               />
               <Line
                 type="monotone"
                 dataKey="efficiency"
                 name="Efficiency"
-                stroke="hsl(165 80% 55%)"
+                stroke={CHART_COLORS.green}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, fill: 'hsl(165 80% 55%)' }}
+                activeDot={{ r: 4, fill: CHART_COLORS.green }}
               />
             </LineChart>
           </ResponsiveContainer>

@@ -14,6 +14,8 @@ import {
   Plus,
   Download,
   RefreshCw,
+  Play,
+  Pause,
   Sparkles,
   Clock,
   AlertTriangle,
@@ -134,7 +136,7 @@ export default function DashboardPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link href="/builder">
-                    <Button variant="outline" size="sm" className="gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" aria-label="View HVAC Map">
                       <Map className="h-4 w-4" />
                       <span className="hidden sm:inline">View HVAC Map</span>
                     </Button>
@@ -147,13 +149,18 @@ export default function DashboardPage() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant={simulationRunning ? 'default' : 'outline'} 
-                    size="sm" 
+                  <Button
+                    variant={simulationRunning ? 'default' : 'outline'}
+                    size="sm"
                     className="gap-2"
                     onClick={toggleSimulation}
+                    aria-label={simulationRunning ? 'Stop simulation' : 'Start simulation'}
                   >
-                    <RefreshCw className={`h-4 w-4 ${simulationRunning ? 'animate-spin' : ''}`} />
+                    {simulationRunning ? (
+                      <Pause className="h-4 w-4" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
                     <span className="hidden sm:inline">
                       {simulationRunning ? 'Stop Sim' : 'Start Sim'}
                     </span>
@@ -166,7 +173,7 @@ export default function DashboardPage() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={refreshData}>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={refreshData} aria-label="Refresh all data">
                     <RefreshCw className="h-4 w-4" />
                     <span className="hidden sm:inline">Refresh</span>
                   </Button>

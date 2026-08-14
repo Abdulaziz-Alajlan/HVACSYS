@@ -135,3 +135,18 @@
 .glow-critical {
   box-shadow: 0 0 20px -5px oklch(0.55 0.22 25 / 0.3);
 }
+
+/* Respects the OS-level motion setting for every animation/transition in the
+   app (spinners, pulses, glow, chart/canvas transitions) in one place, rather
+   than adding a motion-reduce: variant at each of the many animate-spin/
+   animate-pulse call sites individually. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

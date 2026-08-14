@@ -23,6 +23,7 @@ import { useHVACStore } from '@/lib/hvac-store';
 import type { Issue, MaintenanceEvent, LiveRecommendation } from '@/lib/hvac-types';
 import { cn } from '@/lib/utils';
 import { RelativeTime } from './relative-time';
+import { toast } from 'sonner';
 
 const severityConfig = {
   critical: { icon: AlertTriangle, className: 'text-destructive', bgClassName: 'bg-destructive/10' },
@@ -73,18 +74,18 @@ function IssueItem({ issue, onAcknowledge, onResolve }: {
               <span>{issue.source}</span>
             </div>
             {issue.status === 'open' && (
-              <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+              <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-6 px-2 text-xs"
                   onClick={onAcknowledge}
                 >
                   Acknowledge
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-6 px-2 text-xs"
                   onClick={onResolve}
                 >
@@ -143,7 +144,7 @@ function MaintenanceItem({ event }: { event: MaintenanceEvent }) {
             <Clock className="h-3 w-3" />
             <span>
               {isPast && event.status !== 'completed' ? 'Was scheduled for ' : 'Scheduled for '}
-              {eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
             </span>
             <span className="text-border">|</span>
             <span>{event.componentType}: {event.componentId}</span>
@@ -195,7 +196,7 @@ function RecommendationItem({ rec, onApply }: { rec: LiveRecommendation; onApply
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+                className="h-6 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                 onClick={onApply}
               >
                 Apply
@@ -216,10 +217,30 @@ export function IssuesPanel() {
     recommendations,
     acknowledgeIssue,
     resolveIssue,
+    reopenIssue,
     applyRecommendation,
     aiOptimizationActive,
   } = useHVACStore();
   const [activeTab, setActiveTab] = useState('all');
+
+  // Fire-and-forget status changes with no confirm step; "Undo" on the toast
+  // is the lower-friction alternative to a confirm dialog for this severity
+  // of action (compare to Schedule delete, which does get a confirm dialog).
+  const handleAcknowledge = (issue: Issue) => {
+    acknowledgeIssue(issue.id);
+    toast.success('Issue acknowledged', {
+      description: issue.title,
+      action: { label: 'Undo', onClick: () => reopenIssue(issue.id) },
+    });
+  };
+
+  const handleResolve = (issue: Issue) => {
+    resolveIssue(issue.id);
+    toast.success('Issue resolved', {
+      description: issue.title,
+      action: { label: 'Undo', onClick: () => reopenIssue(issue.id) },
+    });
+  };
 
   const openIssues = issues.filter(i => i.status === 'open');
   const criticalCount = openIssues.filter(i => i.severity === 'critical').length;
@@ -268,8 +289,8 @@ export function IssuesPanel() {
                   <IssueItem 
                     key={issue.id} 
                     issue={issue}
-                    onAcknowledge={() => acknowledgeIssue(issue.id)}
-                    onResolve={() => resolveIssue(issue.id)}
+                    onAcknowledge={() => handleAcknowledge(issue)}
+                    onResolve={() => handleResolve(issue)}
                   />
                 ))}
               {/* Then recommendations */}
@@ -283,8 +304,8 @@ export function IssuesPanel() {
                   <IssueItem 
                     key={issue.id} 
                     issue={issue}
-                    onAcknowledge={() => acknowledgeIssue(issue.id)}
-                    onResolve={() => resolveIssue(issue.id)}
+                    onAcknowledge={() => handleAcknowledge(issue)}
+                    onResolve={() => handleResolve(issue)}
                   />
                 ))}
               {/* Then maintenance */}
@@ -305,8 +326,8 @@ export function IssuesPanel() {
                   <IssueItem 
                     key={issue.id} 
                     issue={issue}
-                    onAcknowledge={() => acknowledgeIssue(issue.id)}
-                    onResolve={() => resolveIssue(issue.id)}
+                    onAcknowledge={() => handleAcknowledge(issue)}
+                    onResolve={() => handleResolve(issue)}
                   />
                 ))
               )}

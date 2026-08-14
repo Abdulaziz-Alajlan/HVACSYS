@@ -13,6 +13,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useHVACStore } from '@/lib/hvac-store';
 import { cn } from '@/lib/utils';
+import { CHART_COLORS, CHART_COLORS_FILL_20 } from '@/lib/chart-colors';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 
 interface KPICardProps {
@@ -63,10 +65,10 @@ function KPICard({
   };
 
   const sparklineColors = {
-    default: { stroke: 'hsl(220 80% 65%)', fill: 'hsl(220 80% 65% / 0.2)' },
-    success: { stroke: 'hsl(165 80% 55%)', fill: 'hsl(165 80% 55% / 0.2)' },
-    warning: { stroke: 'hsl(45 90% 55%)', fill: 'hsl(45 90% 55% / 0.2)' },
-    critical: { stroke: 'hsl(0 80% 55%)', fill: 'hsl(0 80% 55% / 0.2)' },
+    default: { stroke: CHART_COLORS.blue, fill: CHART_COLORS_FILL_20.blue },
+    success: { stroke: CHART_COLORS.green, fill: CHART_COLORS_FILL_20.green },
+    warning: { stroke: CHART_COLORS.amber, fill: CHART_COLORS_FILL_20.amber },
+    critical: { stroke: CHART_COLORS.red, fill: CHART_COLORS_FILL_20.red },
   };
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
@@ -154,8 +156,24 @@ function KPICard({
   return content;
 }
 
+function KPICardsSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6" aria-busy="true" aria-label="Loading dashboard metrics">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-4">
+            <Skeleton className="h-4 w-20 mb-3" />
+            <Skeleton className="h-7 w-16 mb-2" />
+            <Skeleton className="h-3 w-24" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export function KPICards() {
-  const { kpis, utilizationHistory, rooms, issues, aiOptimizationActive } = useHVACStore();
+  const { kpis, utilizationHistory, rooms, issues, aiOptimizationActive, isInitialLoading } = useHVACStore();
   const [mounted, setMounted] = useState(false);
 
   // Prevent hydration mismatch by only rendering time-based values on client
@@ -173,9 +191,16 @@ export function KPICards() {
   
   // Format peak time - only on client to avoid hydration mismatch
   const peakTime = kpis.predictedPeakDemandTime;
-  const peakTimeStr = mounted && peakTime 
-    ? `${peakTime.getHours()}:${String(peakTime.getMinutes()).padStart(2, '0')}` 
+  const peakTimeStr = mounted && peakTime
+    ? `${peakTime.getHours()}:${String(peakTime.getMinutes()).padStart(2, '0')}`
     : '--:--';
+
+  // Before this, kpis.totalActiveRooms/totalRooms are both 0 — identical to
+  // a genuinely empty building. A skeleton makes "still loading" visually
+  // distinct from "0 active rooms."
+  if (isInitialLoading) {
+    return <KPICardsSkeleton />;
+  }
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
@@ -241,9 +266,11 @@ export function KPICards() {
       <KPICard
         title="Peak Demand"
         value={peakTimeStr}
+        trend={kpis.demandTrend === 'increasing' ? 'up' : kpis.demandTrend === 'decreasing' ? 'down' : 'neutral'}
+        trendValue={kpis.demandTrend === 'increasing' ? 'Rising' : kpis.demandTrend === 'decreasing' ? 'Falling' : 'Low'}
         description="Predicted today"
         icon={<Clock className="h-5 w-5" />}
-        tooltip="AI-predicted peak cooling demand time based on historical patterns and scheduled occupancy"
+        tooltip="AI-predicted peak cooling demand time based on historical patterns and scheduled occupancy. Trend compares predicted vs. current fleet-wide demand."
       />
     </div>
   );

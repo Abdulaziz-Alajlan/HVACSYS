@@ -7,6 +7,7 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  KeyboardSensor,
   MouseSensor,
   TouchSensor,
   useSensor,
@@ -15,50 +16,40 @@ import {
 import { NodePalette } from "@/components/hvac/builder/node-palette";
 import { BuilderCanvas } from "@/components/hvac/builder/builder-canvas";
 import { PropertiesPanel } from "@/components/hvac/builder/properties-panel";
+import { nodeIcons, nodeColors } from "@/components/hvac/builder/node-types";
 import { useBuilderStore } from "@/lib/builder-store";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Wind, Snowflake, Flame, Fan, Building2, Gauge, Zap } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-
-const nodeIcons: Record<string, React.ReactNode> = {
-  ahu: <Wind className="h-5 w-5" />,
-  chiller: <Snowflake className="h-5 w-5" />,
-  boiler: <Flame className="h-5 w-5" />,
-  vav: <Fan className="h-5 w-5" />,
-  zone: <Building2 className="h-5 w-5" />,
-  sensor: <Gauge className="h-5 w-5" />,
-  pump: <Zap className="h-5 w-5" />,
-};
-
-const nodeColors: Record<string, string> = {
-  ahu: "bg-chart-1/20 text-chart-1 border-chart-1/30",
-  chiller: "bg-chart-2/20 text-chart-2 border-chart-2/30",
-  boiler: "bg-chart-3/20 text-chart-3 border-chart-3/30",
-  vav: "bg-chart-4/20 text-chart-4 border-chart-4/30",
-  zone: "bg-secondary text-foreground border-border",
-  sensor: "bg-chart-5/20 text-chart-5 border-chart-5/30",
-  pump: "bg-primary/20 text-primary border-primary/30",
-};
 
 function BuilderContent() {
   const [activeDrag, setActiveDrag] = useState<{ type: string; label: string } | null>(null);
   const addNode = useBuilderStore((s) => s.addNode);
   const syncZoneMapping = useBuilderStore((s) => s.syncZoneMapping);
+  const setZoneSyncFailed = useBuilderStore((s) => s.setZoneSyncFailed);
 
   // Map room nodes whose name matches a real backend zone (and pull their
   // real current/target temp, occupancy, etc.), so AI Optimize/Apply/
   // scenario actions know which zone to call and the panel shows real
-  // values, not the default layout's random mock data. Silently no-ops if
-  // the backend isn't reachable — the builder still works as a freeform editor.
+  // values, not the default layout's random mock data. The builder still
+  // works as a freeform editor if the backend isn't reachable, but
+  // zoneSyncFailed surfaces that in the toolbar rather than only console.error
+  // — otherwise a user only discovers it node-by-node.
   useEffect(() => {
     api
       .getZones()
-      .then((zones) => syncZoneMapping(zones))
-      .catch((err) => console.error('Failed to sync builder zones with backend:', err));
-  }, [syncZoneMapping]);
+      .then((zones) => {
+        setZoneSyncFailed(false);
+        return syncZoneMapping(zones);
+      })
+      .catch((err) => {
+        console.error('Failed to sync builder zones with backend:', err);
+        setZoneSyncFailed(true);
+      });
+  }, [syncZoneMapping, setZoneSyncFailed]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -71,7 +62,13 @@ function BuilderContent() {
         delay: 250,
         tolerance: 5,
       },
-    })
+    }),
+    // Palette items already get role="button"/tabIndex from dnd-kit's
+    // useDraggable, but without this sensor registered, Space/Enter on a
+    // focused item did nothing — this is the actual gap, not the ARIA
+    // attributes. Space/Enter picks up, arrow keys move, Space/Enter drops,
+    // Esc cancels (dnd-kit's default keyboard codes).
+    useSensor(KeyboardSensor)
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -132,30 +129,33 @@ function BuilderContent() {
         </header>
 
         {/* Main content */}
-        <div className="flex-1 flex overflow-hidden">
+        <main className="flex-1 flex overflow-hidden" aria-label="HVAC system builder workspace">
           <NodePalette />
           <ReactFlowProvider>
             <BuilderCanvas />
           </ReactFlowProvider>
           <PropertiesPanel />
-        </div>
+        </main>
       </div>
 
       {/* Drag overlay */}
       <DragOverlay>
-        {activeDrag && (
-          <div
-            className={cn(
-              "flex items-center gap-3 rounded-lg border p-3 shadow-xl",
-              nodeColors[activeDrag.type]
-            )}
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-background/50">
-              {nodeIcons[activeDrag.type]}
+        {activeDrag && (() => {
+          const Icon = nodeIcons[activeDrag.type];
+          return (
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-lg border p-3 shadow-xl",
+                nodeColors[activeDrag.type]
+              )}
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-background/50">
+                {Icon && <Icon className="h-5 w-5" />}
+              </div>
+              <span className="text-sm font-medium">{activeDrag.label}</span>
             </div>
-            <span className="text-sm font-medium">{activeDrag.label}</span>
-          </div>
-        )}
+          );
+        })()}
       </DragOverlay>
     </DndContext>
   );

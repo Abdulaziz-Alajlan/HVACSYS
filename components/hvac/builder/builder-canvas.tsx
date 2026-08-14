@@ -15,6 +15,17 @@ import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { nodeTypes } from "./custom-nodes";
 import { useBuilderStore, type HVACEdge, type HVACNode, type RoomNodeData } from "@/lib/builder-store";
 import {
@@ -28,6 +39,7 @@ import {
   Sparkles,
   CheckCheck,
   Loader2,
+  WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -55,6 +67,7 @@ export function BuilderCanvas() {
     runAIOptimizeAll,
     applyAllRecommendations,
     isSyncing,
+    zoneSyncFailed,
   } = useBuilderStore();
 
   const zoneRoomCount = nodes.filter((n) => n.data.type === "room" && (n.data as RoomNodeData).zoneId !== undefined).length;
@@ -216,6 +229,8 @@ export function BuilderCanvas() {
               size="sm"
               onClick={() => zoomOut()}
               className="h-8 w-8 p-0"
+              aria-label="Zoom out"
+              title="Zoom out"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -224,6 +239,8 @@ export function BuilderCanvas() {
               size="sm"
               onClick={() => zoomIn()}
               className="h-8 w-8 p-0"
+              aria-label="Zoom in"
+              title="Zoom in"
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -233,6 +250,8 @@ export function BuilderCanvas() {
               size="sm"
               onClick={() => fitView({ padding: 0.2 })}
               className="h-8 w-8 p-0"
+              aria-label="Fit view"
+              title="Fit view"
             >
               <Maximize2 className="h-4 w-4" />
             </Button>
@@ -247,30 +266,63 @@ export function BuilderCanvas() {
                 "h-8 gap-1.5",
                 simulationActive && "bg-accent hover:bg-accent/90 text-accent-foreground"
               )}
+              title={
+                simulationActive
+                  ? "Stop the animated flow on connection lines"
+                  : "Animate flow direction on connection lines (visual only — doesn't run the physics simulator)"
+              }
             >
               {simulationActive ? (
                 <>
                   <Pause className="h-4 w-4" />
-                  Running
+                  Animating
                 </>
               ) : (
                 <>
                   <Play className="h-4 w-4" />
-                  Simulate
+                  Animate Flow
                 </>
               )}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetLayout}
-              className="h-8 w-8 p-0"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  aria-label="Reset layout"
+                  title="Reset layout"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset layout?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This clears every node and connection on the canvas and restores the default
+                    layout. This can&apos;t be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={resetLayout}>Reset layout</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           <div className="flex items-center gap-1 rounded-lg border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
+            {zoneSyncFailed && (
+              <Badge
+                variant="destructive"
+                className="ml-1 gap-1 text-[10px]"
+                title="Backend unreachable — AI features are unavailable until the connection is restored. The canvas still works as a freeform editor."
+              >
+                <WifiOff className="h-3 w-3" />
+                Backend unreachable
+              </Badge>
+            )}
             {isSyncing && (
               <Badge variant="outline" className="ml-1 gap-1 text-[10px]" title="Syncing room data with the backend">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -319,9 +371,15 @@ export function BuilderCanvas() {
           </div>
 
           <div className="flex items-center gap-1 rounded-lg border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
-            <Button variant="ghost" size="sm" onClick={handleSave} className="h-8 gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSave}
+              className="h-8 gap-1.5"
+              title="Download this layout as a JSON file (hvac-system.json)"
+            >
               <Download className="h-4 w-4" />
-              Export
+              Export JSON
             </Button>
           </div>
         </Panel>
@@ -337,7 +395,7 @@ export function BuilderCanvas() {
             </Badge>
             {simulationActive && (
               <Badge className="bg-accent/20 text-accent border-accent/30 text-xs animate-pulse">
-                Simulating
+                Animating flow
               </Badge>
             )}
           </div>
