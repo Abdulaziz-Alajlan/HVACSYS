@@ -66,34 +66,32 @@ function IssueItem({ issue, onAcknowledge, onResolve }: {
             </Badge>
           </div>
           <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{issue.description}</p>
-          <div className="mt-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span><RelativeTime date={issue.timestamp} /></span>
-              <span className="text-border">|</span>
-              <span>{issue.source}</span>
-            </div>
-            {issue.status === 'open' && (
-              <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={onAcknowledge}
-                >
-                  Acknowledge
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={onResolve}
-                >
-                  Resolve
-                </Button>
-              </div>
-            )}
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span className="shrink-0"><RelativeTime date={issue.timestamp} /></span>
+            <span className="text-border">|</span>
+            <span className="truncate">{issue.source}</span>
           </div>
+          {issue.status === 'open' && (
+            <div className="mt-2 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={onAcknowledge}
+              >
+                Acknowledge
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={onResolve}
+              >
+                Resolve
+              </Button>
+            </div>
+          )}
           {issue.suggestedAction && issue.status === 'open' && (
             <div className="mt-2 flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">
               <Lightbulb className="h-3 w-3 shrink-0 text-primary" />
