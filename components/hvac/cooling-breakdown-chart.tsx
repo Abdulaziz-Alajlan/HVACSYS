@@ -141,7 +141,7 @@ export function CoolingBreakdownChart() {
                     />
                   ))}
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 20 }} />
               </PieChart>
             </ResponsiveContainer>
 

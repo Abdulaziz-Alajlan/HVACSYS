@@ -87,12 +87,26 @@ def optimize(db: Session, zone: Zone) -> dict | None:
 
     energy_change = best["energy"] - baseline["energy"]
 
-    reason = (
-        f"Setting damper to {best['damper']:.0f}% (from {current.damper_position:.0f}%) is projected to "
-        f"reach {best['temp']:.1f}°C vs {baseline['temp']:.1f}°C if unchanged "
-        f"(target {zone.target_temperature:.1f}°C) over the next {HORIZON_MINUTES} min, "
-        f"{'using' if energy_change >= 0 else 'saving'} {abs(energy_change):.3f} kWh."
-    )
+    # Even the best candidate can't reach the deadband — the zone's heat gain
+    # currently exceeds its max cooling capacity, not a search failure. Flag
+    # it explicitly rather than let the reason read like a generic/stuck
+    # response when every scenario severe enough to trigger this converges on
+    # the same "100%" ceiling regardless of how far over capacity it is.
+    capacity_constrained = best["damper"] >= max(DAMPER_CANDIDATES) - 1e-9 and new_deviation > COMFORT_DEADBAND_C
+
+    if capacity_constrained:
+        reason = (
+            f"Zone demand currently exceeds cooling capacity even at 100% damper — "
+            f"projected to reach {best['temp']:.1f}°C vs target {zone.target_temperature:.1f}°C "
+            f"over the next {HORIZON_MINUTES} min despite maximum airflow."
+        )
+    else:
+        reason = (
+            f"Setting damper to {best['damper']:.0f}% (from {current.damper_position:.0f}%) is projected to "
+            f"reach {best['temp']:.1f}°C vs {baseline['temp']:.1f}°C if unchanged "
+            f"(target {zone.target_temperature:.1f}°C) over the next {HORIZON_MINUTES} min, "
+            f"{'using' if energy_change >= 0 else 'saving'} {abs(energy_change):.3f} kWh."
+        )
 
     return {
         "timestamp": current.timestamp,

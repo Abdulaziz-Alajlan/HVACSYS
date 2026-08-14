@@ -77,7 +77,7 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 space-y-6 px-4 pb-6">
           {/* Temperature Section */}
           <section>
             <h3 className="mb-3 text-sm font-medium text-foreground">Temperature</h3>
