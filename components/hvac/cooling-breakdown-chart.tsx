@@ -135,7 +135,7 @@ export function CoolingBreakdownChart() {
                     <Cell
                       key={`cell-${index}`}
                       fill={COLORS[index % COLORS.length]}
-                      stroke="hsl(var(--background))"
+                      stroke="var(--background)"
                       strokeWidth={2}
                       className="cursor-pointer transition-opacity hover:opacity-80"
                     />

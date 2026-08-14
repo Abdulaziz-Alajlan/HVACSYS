@@ -126,7 +126,7 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
                     fontSize={9}
                     tickLine={false}
                     axisLine={false}
-                    stroke="hsl(var(--muted-foreground))"
+                    stroke="var(--muted-foreground)"
                     interval="preserveStartEnd"
                   />
                   <YAxis 

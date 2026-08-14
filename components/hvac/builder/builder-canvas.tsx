@@ -184,7 +184,7 @@ export function BuilderCanvas() {
         snapGrid={[15, 15]}
         defaultEdgeOptions={{
           animated: simulationActive,
-          style: { stroke: "hsl(var(--chart-1))", strokeWidth: 2 },
+          style: { stroke: "var(--chart-1)", strokeWidth: 2 },
         }}
         className="bg-background"
       >
@@ -192,7 +192,7 @@ export function BuilderCanvas() {
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1}
-          color="hsl(var(--border))"
+          color="var(--border)"
         />
         
         <Controls
@@ -205,17 +205,17 @@ export function BuilderCanvas() {
         <MiniMap
           nodeColor={(node) => {
             const colors: Record<string, string> = {
-              ahu: "hsl(var(--chart-1))",
-              chiller: "hsl(var(--chart-2))",
-              boiler: "hsl(var(--chart-3))",
-              vav: "hsl(var(--chart-4))",
-              zone: "hsl(var(--secondary))",
-              sensor: "hsl(var(--chart-5))",
-              pump: "hsl(var(--primary))",
+              ahu: "var(--chart-1)",
+              chiller: "var(--chart-2)",
+              boiler: "var(--chart-3)",
+              vav: "var(--chart-4)",
+              zone: "var(--secondary)",
+              sensor: "var(--chart-5)",
+              pump: "var(--primary)",
             };
-            return colors[node.type || ""] || "hsl(var(--muted))";
+            return colors[node.type || ""] || "var(--muted)";
           }}
-          maskColor="hsl(var(--background) / 0.8)"
+          maskColor="color-mix(in srgb, var(--background) 80%, transparent)"
           className="!bg-card !border-border"
           pannable
           zoomable

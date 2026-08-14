@@ -176,20 +176,20 @@ export function UtilizationChart() {
               </defs>
               <CartesianGrid 
                 strokeDasharray="3 3" 
-                stroke="hsl(var(--border))" 
+                stroke="var(--border)" 
                 opacity={0.4}
                 vertical={false}
               />
               <XAxis 
                 dataKey="time" 
-                stroke="hsl(var(--muted-foreground))"
+                stroke="var(--muted-foreground)"
                 fontSize={10}
                 tickLine={false}
                 axisLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis 
-                stroke="hsl(var(--muted-foreground))"
+                stroke="var(--muted-foreground)"
                 fontSize={10}
                 tickLine={false}
                 axisLine={false}
@@ -208,7 +208,7 @@ export function UtilizationChart() {
               />
               <ReferenceLine 
                 y={85} 
-                stroke="hsl(var(--warning))" 
+                stroke="var(--warning)" 
                 strokeDasharray="5 5"
                 opacity={0.6}
               />
