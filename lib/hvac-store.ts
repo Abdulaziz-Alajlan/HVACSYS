@@ -11,17 +11,25 @@ import {
   generateSchedules,
   generateIssues,
   generateMaintenanceEvents,
-  generateRecommendations,
   generateUtilizationHistory,
 } from './hvac-mock-data';
-import { fetchLiveZoneBundles, bundleToRoom, computeDemandInsights } from './hvac-live-data';
+import {
+  fetchLiveZoneBundles,
+  bundleToRoom,
+  bundleToRecommendation,
+  computeDemandInsights,
+} from './hvac-live-data';
+import { computeComfortScore, computeIssueFlags, deriveCoolingStatus } from './zone-derived';
+import { api } from './api';
+import { toast } from 'sonner';
 
-// Builds a full dashboard state from real backend data: rooms come from
-// live zones/readings/predictions/recommendations; cooling units, dampers,
-// schedules, issues, and maintenance events have no backend model yet, so
-// they're still mock-generated, but issues/schedules/recommendations are
-// derived FROM the real rooms (those generators already take rooms as
-// input), so they stay consistent with the real numbers shown elsewhere.
+// Builds a full dashboard state from real backend data: rooms and
+// recommendations come directly from live zones/readings/predictions/
+// recommendations; cooling units, dampers, schedules, and maintenance
+// events have no backend model yet, so they're still mock-generated, but
+// issues/schedules are derived FROM the real rooms (those generators
+// already take rooms as input), so they stay consistent with the real
+// numbers shown elsewhere.
 async function buildLiveState(aiEnabled: boolean): Promise<HVACSystemState> {
   const bundles = await fetchLiveZoneBundles(aiEnabled);
   if (bundles.length === 0) {
@@ -34,7 +42,9 @@ async function buildLiveState(aiEnabled: boolean): Promise<HVACSystemState> {
   const schedules = generateSchedules(rooms);
   const issues = generateIssues(coolingUnits, dampers, rooms);
   const maintenanceEvents = generateMaintenanceEvents(coolingUnits);
-  const recommendations = generateRecommendations(rooms, dampers, coolingUnits);
+  const recommendations = bundles
+    .map(bundleToRecommendation)
+    .filter((r): r is NonNullable<typeof r> => r !== null);
   const utilizationHistory = generateUtilizationHistory();
   const insights = computeDemandInsights(bundles);
 
@@ -66,6 +76,7 @@ async function buildLiveState(aiEnabled: boolean): Promise<HVACSystemState> {
     lastUpdated: new Date(),
     aiOptimizationActive: true,
     simulationRunning: false,
+    dataSource: 'live',
   };
 }
 
@@ -84,7 +95,8 @@ interface HVACStore extends HVACSystemState {
   resolveIssue: (id: string) => void;
   setTimeRange: (range: '1h' | '24h' | '7d') => void;
   refreshData: () => Promise<void>;
-  
+  applyRecommendation: (id: number) => Promise<void>;
+
   // UI State
   selectedRoomId: string | null;
   selectedCoolingUnitId: string | null;
@@ -131,7 +143,8 @@ export const useHVACStore = create<HVACStore>()(
       lastUpdated: new Date(),
       aiOptimizationActive: true,
       simulationRunning: false,
-      
+      dataSource: 'live',
+
       // UI State
       selectedRoomId: null,
       selectedCoolingUnitId: null,
@@ -148,7 +161,15 @@ export const useHVACStore = create<HVACStore>()(
         try {
           const liveState = await buildLiveState(get().aiOptimizationActive);
           if (version !== liveFetchVersion) return; // superseded by a newer fetch
-          set({ ...liveState, aiOptimizationActive: get().aiOptimizationActive });
+          // Manually-created schedules (added via the Schedule dialog) aren't
+          // backend-derived, so buildLiveState's freshly-regenerated
+          // schedules shouldn't blindly replace them — merge instead.
+          const manualSchedules = get().schedules.filter((s) => s.source === 'manual');
+          set({
+            ...liveState,
+            schedules: [...manualSchedules, ...liveState.schedules],
+            aiOptimizationActive: get().aiOptimizationActive,
+          });
         } catch (err) {
           if (version !== liveFetchVersion) return;
           console.error('Failed to load live backend data, falling back to mock data:', err);
@@ -234,14 +255,65 @@ export const useHVACStore = create<HVACStore>()(
         try {
           const liveState = await buildLiveState(get().aiOptimizationActive);
           if (version !== liveFetchVersion) return; // superseded by a newer fetch
-          set({ ...liveState, aiOptimizationActive: get().aiOptimizationActive });
+          const manualSchedules = get().schedules.filter((s) => s.source === 'manual');
+          set({
+            ...liveState,
+            schedules: [...manualSchedules, ...liveState.schedules],
+            aiOptimizationActive: get().aiOptimizationActive,
+          });
         } catch (err) {
           if (version !== liveFetchVersion) return;
           console.error('Failed to refresh live backend data, falling back to mock data:', err);
           set(generateInitialHVACState());
         }
       },
-      
+
+      // Mirrors the Builder's applyRecommendation action (lib/builder-store.ts):
+      // calls the real backend, which runs an actual physics tick, then
+      // recomputes the affected room's derived fields from the returned
+      // reading via the same zone-derived.ts formulas.
+      applyRecommendation: async (id) => {
+        const rec = get().recommendations.find((r) => r.id === id);
+        if (!rec || !rec.isReal || rec.status !== 'pending') return;
+
+        try {
+          const result = await api.applyRecommendation(id);
+          const reading = result.new_reading;
+          set((state) => ({
+            recommendations: state.recommendations.map((r) =>
+              r.id === id ? { ...r, status: 'applied' } : r
+            ),
+            rooms: state.rooms.map((room) => {
+              if (room.id !== rec.roomId) return room;
+              return {
+                ...room,
+                currentTemp: reading.temperature,
+                occupancyCount: reading.occupancy,
+                airflowEstimate: Math.round(reading.airflow),
+                damperPosition: Math.round(reading.damper_position),
+                comfortScore: Math.round(
+                  computeComfortScore(reading.temperature, room.targetTemp, reading.occupancy, room.capacity)
+                ),
+                coolingStatus: deriveCoolingStatus(reading.damper_position, reading.occupancy),
+                issueFlags: computeIssueFlags(
+                  reading.temperature,
+                  room.targetTemp,
+                  reading.occupancy,
+                  room.capacity,
+                  reading.airflow,
+                  room.roomType
+                ),
+              };
+            }),
+          }));
+          toast.success(`Applied AI recommendation to ${rec.zoneName}`);
+        } catch (err) {
+          console.error(`Failed to apply recommendation for ${rec.zoneName}:`, err);
+          toast.error(`Failed to apply recommendation for ${rec.zoneName}`);
+        }
+      },
+
+
       // UI State setters
       setSelectedRoom: (id) => set({ selectedRoomId: id }),
       setSelectedCoolingUnit: (id) => set({ selectedCoolingUnitId: id }),

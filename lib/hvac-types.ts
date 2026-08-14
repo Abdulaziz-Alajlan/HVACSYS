@@ -64,6 +64,7 @@ export interface Room {
   expectedCoolingStartTime: Date | null;
   assignedCoolingUnit: string;
   connectedDamper: string;
+  damperPosition: number; // 0-100, % open
   airflowEstimate: number; // CFM
   scheduleStatus: ScheduleStatus | null;
   priorityLevel: 'low' | 'medium' | 'high' | 'critical';
@@ -109,16 +110,22 @@ export interface MaintenanceEvent {
   note: string;
 }
 
-export interface Recommendation {
-  id: string;
-  title: string;
-  type: 'energy-saving' | 'comfort' | 'maintenance' | 'optimization';
-  affectedComponents: { type: 'room' | 'cooling-unit' | 'damper'; id: string; name: string }[];
-  estimatedImpact: string;
-  confidenceScore: number; // 0-100
-  generatedTime: Date;
-  rationale: string;
-  suggestedAction: string;
+// Real (or, for the mock-fallback path, mock-but-shaped-the-same) AI
+// recommendation, sourced from the backend's optimizer per zone
+// (backend/app/ml/optimizer.py) rather than a generic template. `isReal`
+// gates whether "Apply" can do anything — the mock-fallback path has no
+// backend to apply against, so its cards are informational only.
+export interface LiveRecommendation {
+  id: number;
+  roomId: string;
+  zoneName: string;
+  action: string; // 'increase_airflow' | 'decrease_airflow' | 'maintain'
+  reason: string;
+  estimatedEnergyChange: number; // kWh, negative = savings
+  comfortImpact: string | null; // 'improves' | 'neutral' | 'degrades'
+  status: string; // 'pending' | 'applied'
+  timestamp: string;
+  isReal: boolean;
 }
 
 export interface KPIData {
@@ -147,10 +154,14 @@ export interface HVACSystemState {
   schedules: Schedule[];
   issues: Issue[];
   maintenanceEvents: MaintenanceEvent[];
-  recommendations: Recommendation[];
+  recommendations: LiveRecommendation[];
   kpis: KPIData;
   utilizationHistory: TimeSeriesPoint[];
   lastUpdated: Date;
   aiOptimizationActive: boolean;
   simulationRunning: boolean;
+  // 'mock-fallback' when the backend was unreachable and generateInitialHVACState()
+  // was used instead — surfaced in the UI so a fully-plausible-looking
+  // dashboard doesn't silently pass as real data.
+  dataSource: 'live' | 'mock-fallback';
 }

@@ -9,7 +9,7 @@
 // that look identical to a viewer.
 
 import { api, type ApiPrediction, type ApiReading, type ApiRecommendation, type ApiZone } from './api';
-import type { Room, RoomType } from './hvac-types';
+import type { LiveRecommendation, Room, RoomType } from './hvac-types';
 import { computeComfortScore, computeIssueFlags, deriveCoolingStatus } from './zone-derived';
 
 const HISTORY_LIMIT = 288; // 24h at 5-min intervals
@@ -101,11 +101,34 @@ export function bundleToRoom(bundle: LiveZoneBundle): Room {
     expectedCoolingStartTime: null,
     assignedCoolingUnit: meta.unit,
     connectedDamper: meta.damper,
+    damperPosition: Math.round(latestReading.damper_position),
     airflowEstimate: Math.round(latestReading.airflow),
     scheduleStatus: null,
     priorityLevel: meta.priority,
     issueFlags,
     temperatureHistory: history.map((r) => ({ time: new Date(r.timestamp), value: r.temperature })),
+  };
+}
+
+/** Maps a bundle's real per-zone recommendation onto a display card. Returns
+ * null when there isn't one — AI off, or the per-zone recommend call failed
+ * — so callers can filter those out rather than showing a placeholder. */
+export function bundleToRecommendation(bundle: LiveZoneBundle): LiveRecommendation | null {
+  const { zone, recommendation } = bundle;
+  if (!recommendation) return null;
+  const meta = ZONE_ROOM_META[zone.name];
+
+  return {
+    id: recommendation.id,
+    roomId: meta.id,
+    zoneName: zone.name,
+    action: recommendation.action,
+    reason: recommendation.reason,
+    estimatedEnergyChange: recommendation.estimated_energy_change,
+    comfortImpact: recommendation.comfort_impact,
+    status: recommendation.status,
+    timestamp: recommendation.timestamp,
+    isReal: true,
   };
 }
 

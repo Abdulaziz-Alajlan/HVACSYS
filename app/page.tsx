@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Sparkles,
   Clock,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Header } from '@/components/hvac/header';
@@ -30,14 +31,15 @@ import { useHVACStore } from '@/lib/hvac-store';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardPage() {
-  const { 
-    initialize, 
-    lastUpdated, 
-    aiOptimizationActive, 
+  const {
+    initialize,
+    lastUpdated,
+    aiOptimizationActive,
     simulationRunning,
     toggleSimulation,
     runSimulationTick,
     refreshData,
+    dataSource,
   } = useHVACStore();
 
   // Initialize data on mount
@@ -108,6 +110,21 @@ export default function DashboardPage() {
                   <RefreshCw className="h-3 w-3 animate-spin" />
                   Live
                 </Badge>
+              )}
+              {dataSource === 'mock-fallback' && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="outline" className="gap-1 text-[10px] text-warning border-warning/30">
+                        <AlertTriangle className="h-3 w-3" />
+                        Offline — showing mock data
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Backend unreachable — this is placeholder data, not live sensor readings</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
           </div>

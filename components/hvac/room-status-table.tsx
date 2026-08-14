@@ -53,7 +53,7 @@ type SortField = 'name' | 'currentTemp' | 'comfortScore' | 'occupancyCount';
 type SortDirection = 'asc' | 'desc';
 
 export function RoomStatusTable() {
-  const { rooms, coolingUnits, dampers, highlightedRoomId, setSelectedRoom, selectedRoomId } = useHVACStore();
+  const { rooms, coolingUnits, highlightedRoomId, setSelectedRoom, selectedRoomId } = useHVACStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CoolingStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<RoomType | 'all'>('all');
@@ -232,7 +232,6 @@ export function RoomStatusTable() {
               <TableBody>
                 {filteredAndSortedRooms.map(room => {
                   const unit = coolingUnits.find(u => u.id === room.assignedCoolingUnit);
-                  const damper = dampers.find(d => d.id === room.connectedDamper);
                   const statusConfig = coolingStatusConfig[room.coolingStatus];
                   const comfortBadge = getComfortBadge(room.comfortScore);
                   const isHighlighted = room.id === highlightedRoomId;
@@ -295,7 +294,7 @@ export function RoomStatusTable() {
                       <TableCell>
                         <div className="flex items-center gap-1.5">
                           <Wind className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm">{damper?.openness ?? 0}%</span>
+                          <span className="text-sm">{room.damperPosition}%</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">

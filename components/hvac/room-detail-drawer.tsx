@@ -50,9 +50,7 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
   const damper = dampers.find(d => d.id === room.connectedDamper);
   const roomSchedules = schedules.filter(s => s.roomId === room.id);
   const roomIssues = issues.filter(i => i.relatedComponent.id === room.id && i.status === 'open');
-  const roomRecommendations = recommendations.filter(r => 
-    r.affectedComponents.some(c => c.id === room.id)
-  );
+  const roomRecommendations = recommendations.filter(r => r.roomId === room.id);
 
   const tempHistory = room.temperatureHistory.slice(-24).map(p => ({
     time: new Date(p.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
@@ -307,18 +305,19 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
                 </h3>
                 <div className="space-y-2">
                   {roomRecommendations.map(rec => (
-                    <div 
+                    <div
                       key={rec.id}
                       className="rounded-lg border border-primary/20 bg-primary/5 p-3"
                     >
-                      <p className="text-sm font-medium">{rec.title}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{rec.rationale}</p>
+                      <p className="text-sm font-medium capitalize">{rec.action.replace(/_/g, ' ')}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{rec.reason}</p>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          Impact: {rec.estimatedImpact}
+                        <span className={cn('text-xs', rec.estimatedEnergyChange < 0 ? 'text-success' : 'text-muted-foreground')}>
+                          {rec.estimatedEnergyChange >= 0 ? '+' : ''}
+                          {rec.estimatedEnergyChange.toFixed(3)} kWh
                         </span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {rec.confidenceScore}% confidence
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {rec.status}
                         </Badge>
                       </div>
                     </div>

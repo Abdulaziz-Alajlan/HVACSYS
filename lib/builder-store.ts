@@ -98,7 +98,8 @@ interface BuilderState {
   selectedNodeId: string | null;
   aiOverlayEnabled: boolean;
   simulationActive: boolean;
-  
+  isSyncing: boolean;
+
   // Actions
   onNodesChange: (changes: NodeChange<HVACNode>[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -364,16 +365,26 @@ const initialEdges: HVACEdge[] = [
 // result with a stale one. Same version-counter pattern used in
 // hvac-store.ts for initialize()/refreshData(), scoped per-node here since
 // these are per-node operations rather than a single global fetch.
+//
+// Keyed by `${nodeId}:${action}` rather than just nodeId — the three
+// action types share one node's aiLoading flag (so a single-room UI click
+// can't race itself), but "Optimize All" and "Apply All" are separate
+// toolbar buttons with independent loading state, so different actions on
+// the same room CAN overlap. Keying only by nodeId meant a successful
+// Apply could get silently discarded because a concurrent Optimize for the
+// same room bumped the shared counter after it — the backend really did
+// mutate the zone, but the UI never reflected it. Scoping by action keeps
+// each action type's own race-guard independent.
 const nodeFetchVersions = new Map<string, number>();
 
-function bumpNodeVersion(nodeId: string): number {
-  const next = (nodeFetchVersions.get(nodeId) ?? 0) + 1;
-  nodeFetchVersions.set(nodeId, next);
+function bumpNodeVersion(key: string): number {
+  const next = (nodeFetchVersions.get(key) ?? 0) + 1;
+  nodeFetchVersions.set(key, next);
   return next;
 }
 
-function isCurrentNodeVersion(nodeId: string, version: number): boolean {
-  return nodeFetchVersions.get(nodeId) === version;
+function isCurrentNodeVersion(key: string, version: number): boolean {
+  return nodeFetchVersions.get(key) === version;
 }
 
 export const useBuilderStore = create<BuilderState>()(
@@ -384,6 +395,7 @@ export const useBuilderStore = create<BuilderState>()(
       selectedNodeId: null,
       aiOverlayEnabled: false,
       simulationActive: false,
+      isSyncing: false,
 
       onNodesChange: (changes) => {
         set({
@@ -535,55 +547,60 @@ export const useBuilderStore = create<BuilderState>()(
         // next to an AI recommendation reasoning about the real ones. Uses
         // the same derivation formulas as the dashboard (zone-derived.ts) so
         // the two surfaces can't drift apart the way targetTemp once did.
+        set({ isSyncing: true });
         const roomNodes = get().nodes.filter((n) => n.data.type === 'room');
-        await Promise.all(
-          roomNodes.map(async (node) => {
-            const roomData = node.data as RoomNodeData;
-            const zone = zones.find((z) => z.name === roomData.name);
-            if (!zone) {
-              get().updateNodeData(node.id, { zoneId: undefined, aiLoading: false });
-              return;
-            }
-            try {
-              const readings = await api.getZoneReadings(zone.id, 1);
-              const latest = readings[readings.length - 1];
-              if (!latest) {
-                get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
+        try {
+          await Promise.all(
+            roomNodes.map(async (node) => {
+              const roomData = node.data as RoomNodeData;
+              const zone = zones.find((z) => z.name === roomData.name);
+              if (!zone) {
+                get().updateNodeData(node.id, { zoneId: undefined, aiLoading: false });
                 return;
               }
-              const comfortScore = computeComfortScore(
-                latest.temperature,
-                zone.target_temperature,
-                latest.occupancy,
-                zone.capacity
-              );
-              const issues = computeIssueFlags(
-                latest.temperature,
-                zone.target_temperature,
-                latest.occupancy,
-                zone.capacity,
-                latest.airflow,
-                zone.room_type
-              );
-              get().updateNodeData(node.id, {
-                zoneId: zone.id,
-                aiLoading: false,
-                roomType: zone.room_type as RoomNodeData['roomType'],
-                currentTemp: Math.round(latest.temperature * 10) / 10,
-                targetTemp: zone.target_temperature,
-                occupancy: latest.occupancy,
-                capacity: zone.capacity,
-                airflow: Math.round(latest.airflow),
-                comfortScore: Math.round(comfortScore),
-                status: deriveCoolingStatus(latest.damper_position, latest.occupancy),
-                issues,
-              });
-            } catch (err) {
-              console.error(`Failed to sync live data for ${roomData.name}:`, err);
-              get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
-            }
-          })
-        );
+              try {
+                const readings = await api.getZoneReadings(zone.id, 1);
+                const latest = readings[readings.length - 1];
+                if (!latest) {
+                  get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
+                  return;
+                }
+                const comfortScore = computeComfortScore(
+                  latest.temperature,
+                  zone.target_temperature,
+                  latest.occupancy,
+                  zone.capacity
+                );
+                const issues = computeIssueFlags(
+                  latest.temperature,
+                  zone.target_temperature,
+                  latest.occupancy,
+                  zone.capacity,
+                  latest.airflow,
+                  zone.room_type
+                );
+                get().updateNodeData(node.id, {
+                  zoneId: zone.id,
+                  aiLoading: false,
+                  roomType: zone.room_type as RoomNodeData['roomType'],
+                  currentTemp: Math.round(latest.temperature * 10) / 10,
+                  targetTemp: zone.target_temperature,
+                  occupancy: latest.occupancy,
+                  capacity: zone.capacity,
+                  airflow: Math.round(latest.airflow),
+                  comfortScore: Math.round(comfortScore),
+                  status: deriveCoolingStatus(latest.damper_position, latest.occupancy),
+                  issues,
+                });
+              } catch (err) {
+                console.error(`Failed to sync live data for ${roomData.name}:`, err);
+                get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
+              }
+            })
+          );
+        } finally {
+          set({ isSyncing: false });
+        }
       },
 
       runAIOptimize: async (nodeId) => {
@@ -595,11 +612,11 @@ export const useBuilderStore = create<BuilderState>()(
           return;
         }
 
-        const version = bumpNodeVersion(nodeId);
+        const version = bumpNodeVersion(`${nodeId}:optimize`);
         get().updateNodeData(nodeId, { aiLoading: true });
         try {
           const rec = await api.recommendZone(roomData.zoneId);
-          if (!isCurrentNodeVersion(nodeId, version)) return; // superseded by a newer request
+          if (!isCurrentNodeVersion(`${nodeId}:optimize`, version)) return; // superseded by a newer optimize request
           get().updateNodeData(nodeId, {
             aiLoading: false,
             aiRecommendation: {
@@ -615,7 +632,7 @@ export const useBuilderStore = create<BuilderState>()(
           });
           toast.success(`AI recommendation ready for ${roomData.name}`);
         } catch (err) {
-          if (!isCurrentNodeVersion(nodeId, version)) return;
+          if (!isCurrentNodeVersion(`${nodeId}:optimize`, version)) return;
           get().updateNodeData(nodeId, { aiLoading: false });
           toast.error(`Failed to get AI recommendation for ${roomData.name}`);
           console.error(err);
@@ -637,11 +654,11 @@ export const useBuilderStore = create<BuilderState>()(
           return;
         }
 
-        const version = bumpNodeVersion(nodeId);
+        const version = bumpNodeVersion(`${nodeId}:apply`);
         get().updateNodeData(nodeId, { aiLoading: true });
         try {
           const result = await api.applyRecommendation(roomData.aiRecommendation.id);
-          if (!isCurrentNodeVersion(nodeId, version)) return; // superseded by a newer request
+          if (!isCurrentNodeVersion(`${nodeId}:apply`, version)) return; // superseded by a newer apply request
           const reading = result.new_reading;
           // target/capacity/roomType are static per zone, so the existing
           // roomData values are still correct — only the reading changed.
@@ -678,7 +695,7 @@ export const useBuilderStore = create<BuilderState>()(
           }
           toast.success(`Applied AI recommendation to ${roomData.name}`);
         } catch (err) {
-          if (!isCurrentNodeVersion(nodeId, version)) return;
+          if (!isCurrentNodeVersion(`${nodeId}:apply`, version)) return;
           get().updateNodeData(nodeId, { aiLoading: false });
           toast.error(`Failed to apply recommendation for ${roomData.name}`);
           console.error(err);
@@ -701,11 +718,11 @@ export const useBuilderStore = create<BuilderState>()(
           return;
         }
 
-        const version = bumpNodeVersion(nodeId);
+        const version = bumpNodeVersion(`${nodeId}:scenario`);
         get().updateNodeData(nodeId, { aiLoading: true });
         try {
           const reading = await api.triggerScenario(roomData.zoneId, scenario);
-          if (!isCurrentNodeVersion(nodeId, version)) return; // superseded by a newer request
+          if (!isCurrentNodeVersion(`${nodeId}:scenario`, version)) return; // superseded by a newer scenario request
           get().updateNodeData(nodeId, {
             aiLoading: false,
             currentTemp: reading.temperature,
@@ -738,7 +755,7 @@ export const useBuilderStore = create<BuilderState>()(
           }
           toast.success(`Injected ${scenario.replace(/_/g, ' ')} on ${roomData.name}`);
         } catch (err) {
-          if (!isCurrentNodeVersion(nodeId, version)) return;
+          if (!isCurrentNodeVersion(`${nodeId}:scenario`, version)) return;
           get().updateNodeData(nodeId, { aiLoading: false });
           toast.error(`Failed to inject scenario on ${roomData.name}`);
           console.error(err);
@@ -747,6 +764,30 @@ export const useBuilderStore = create<BuilderState>()(
     }),
     {
       name: 'hvac-builder-storage',
+      version: 1,
+      // Bump `version` whenever a field is added to RoomAIRecommendation or
+      // similar derived-only data (zoneId/aiRecommendation/aiLoading) — this
+      // is how the fetchedAt crash happened: a field added later than the
+      // rest of its type, so old localStorage lacked it and an unguarded
+      // read threw. Rather than patching each new field into migrate by
+      // hand, blanket-clear the derived blob on any version bump — it's all
+      // re-populated fresh by syncZoneMapping() on the next mount anyway, so
+      // nothing meaningful is lost, and this is the one place to remember
+      // instead of every render site.
+      migrate: (persistedState, fromVersion) => {
+        const state = persistedState as { nodes: HVACNode[]; edges: HVACEdge[]; aiOverlayEnabled: boolean };
+        if (fromVersion < 1) {
+          return {
+            ...state,
+            nodes: state.nodes.map((n) =>
+              n.data?.type === 'room'
+                ? { ...n, data: { ...n.data, aiRecommendation: null, aiLoading: false, zoneId: undefined } }
+                : n
+            ),
+          };
+        }
+        return state;
+      },
       partialize: (state) => ({
         nodes: state.nodes,
         edges: state.edges,

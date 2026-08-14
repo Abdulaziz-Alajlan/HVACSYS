@@ -16,9 +16,11 @@ import {
   Clock,
   ChevronRight,
   Sparkles,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { useHVACStore } from '@/lib/hvac-store';
-import type { Issue, MaintenanceEvent, Recommendation } from '@/lib/hvac-types';
+import type { Issue, MaintenanceEvent, LiveRecommendation } from '@/lib/hvac-types';
 import { cn } from '@/lib/utils';
 import { RelativeTime } from './relative-time';
 
@@ -152,14 +154,14 @@ function MaintenanceItem({ event }: { event: MaintenanceEvent }) {
   );
 }
 
-function RecommendationItem({ rec }: { rec: Recommendation }) {
-  const typeConfig = {
-    'energy-saving': { icon: Lightbulb, className: 'text-accent' },
-    'comfort': { icon: Sparkles, className: 'text-primary' },
-    'maintenance': { icon: Wrench, className: 'text-warning' },
-    'optimization': { icon: Sparkles, className: 'text-primary' },
-  };
-  const config = typeConfig[rec.type];
+const recommendationActionConfig: Record<string, { icon: typeof Sparkles; className: string; label: string }> = {
+  increase_airflow: { icon: TrendingUp, className: 'text-warning', label: 'Increase airflow' },
+  decrease_airflow: { icon: TrendingDown, className: 'text-accent', label: 'Decrease airflow' },
+  maintain: { icon: Sparkles, className: 'text-primary', label: 'Maintain' },
+};
+
+function RecommendationItem({ rec, onApply }: { rec: LiveRecommendation; onApply: () => void }) {
+  const config = recommendationActionConfig[rec.action] ?? recommendationActionConfig.maintain;
   const Icon = config.icon;
 
   return (
@@ -170,24 +172,36 @@ function RecommendationItem({ rec }: { rec: Recommendation }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium leading-tight text-foreground">{rec.title}</p>
-            <Badge variant="outline" className="shrink-0 text-[10px] border-primary/30 text-primary">
-              {rec.confidenceScore}%
+            <p className="text-sm font-medium leading-tight text-foreground">
+              {config.label} — {rec.zoneName}
+            </p>
+            <Badge
+              variant="outline"
+              className={cn(
+                'shrink-0 text-[10px] capitalize',
+                rec.status === 'applied' ? 'border-accent text-accent' : 'border-primary/30 text-primary'
+              )}
+            >
+              {rec.status}
             </Badge>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{rec.rationale}</p>
+          <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{rec.reason}</p>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              Impact: {rec.estimatedImpact}
+            <span className={cn('text-xs', rec.estimatedEnergyChange < 0 ? 'text-success' : 'text-muted-foreground')}>
+              {rec.estimatedEnergyChange >= 0 ? '+' : ''}
+              {rec.estimatedEnergyChange.toFixed(3)} kWh
             </span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-6 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100"
-            >
-              Apply
-              <ChevronRight className="h-3 w-3" />
-            </Button>
+            {rec.isReal && rec.status === 'pending' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+                onClick={onApply}
+              >
+                Apply
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -196,7 +210,15 @@ function RecommendationItem({ rec }: { rec: Recommendation }) {
 }
 
 export function IssuesPanel() {
-  const { issues, maintenanceEvents, recommendations, acknowledgeIssue, resolveIssue } = useHVACStore();
+  const {
+    issues,
+    maintenanceEvents,
+    recommendations,
+    acknowledgeIssue,
+    resolveIssue,
+    applyRecommendation,
+    aiOptimizationActive,
+  } = useHVACStore();
   const [activeTab, setActiveTab] = useState('all');
 
   const openIssues = issues.filter(i => i.status === 'open');
@@ -252,7 +274,7 @@ export function IssuesPanel() {
                 ))}
               {/* Then recommendations */}
               {recommendations.slice(0, 2).map(rec => (
-                <RecommendationItem key={rec.id} rec={rec} />
+                <RecommendationItem key={rec.id} rec={rec} onApply={() => applyRecommendation(rec.id)} />
               ))}
               {/* Then warnings */}
               {openIssues
@@ -305,7 +327,13 @@ export function IssuesPanel() {
             </TabsContent>
 
             <TabsContent value="recommendations" className="m-0 space-y-3">
-              {recommendations.length === 0 ? (
+              {!aiOptimizationActive ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Sparkles className="h-8 w-8 text-muted-foreground" />
+                  <p className="mt-2 text-sm font-medium">AI Optimization is Off</p>
+                  <p className="text-xs text-muted-foreground">Turn it on in the header to generate recommendations</p>
+                </div>
+              ) : recommendations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Sparkles className="h-8 w-8 text-muted-foreground" />
                   <p className="mt-2 text-sm font-medium">No Recommendations</p>
@@ -313,7 +341,7 @@ export function IssuesPanel() {
                 </div>
               ) : (
                 recommendations.map(rec => (
-                  <RecommendationItem key={rec.id} rec={rec} />
+                  <RecommendationItem key={rec.id} rec={rec} onApply={() => applyRecommendation(rec.id)} />
                 ))
               )}
             </TabsContent>

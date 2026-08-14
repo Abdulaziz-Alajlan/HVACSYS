@@ -54,6 +54,7 @@ export function BuilderCanvas() {
     toggleAIOverlay,
     runAIOptimizeAll,
     applyAllRecommendations,
+    isSyncing,
   } = useBuilderStore();
 
   const zoneRoomCount = nodes.filter((n) => n.data.type === "room" && (n.data as RoomNodeData).zoneId !== undefined).length;
@@ -270,6 +271,12 @@ export function BuilderCanvas() {
           </div>
 
           <div className="flex items-center gap-1 rounded-lg border border-border bg-card/95 p-1 shadow-lg backdrop-blur-sm">
+            {isSyncing && (
+              <Badge variant="outline" className="ml-1 gap-1 text-[10px]" title="Syncing room data with the backend">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Syncing
+              </Badge>
+            )}
             <Button
               variant={aiOverlayEnabled ? "default" : "ghost"}
               size="sm"

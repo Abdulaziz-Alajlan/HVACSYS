@@ -5,7 +5,7 @@ import type {
   Schedule,
   Issue,
   MaintenanceEvent,
-  Recommendation,
+  LiveRecommendation,
   KPIData,
   TimeSeriesPoint,
   HVACSystemState,
@@ -243,6 +243,7 @@ function generateRooms(dampers: Damper[]): Room[] {
       expectedCoolingStartTime: expectedStart,
       assignedCoolingUnit: config.unit,
       connectedDamper: config.damper,
+      damperPosition: Math.round(damperOpenness),
       airflowEstimate: airflow,
       scheduleStatus,
       priorityLevel: config.priority,
@@ -281,7 +282,7 @@ export function generateSchedules(rooms: Room[]): Schedule[] {
       targetTemp: room.targetTemp,
       recurrenceDays: room.scheduleStatus === 'Recurring' ? [1, 2, 3, 4, 5] : [],
       priorityLevel: room.priorityLevel === 'critical' ? 'high' : room.priorityLevel as 'low' | 'medium' | 'high',
-      source: 'manual',
+      source: 'imported',
       createdAt: new Date(now.getTime() - randInt(1, 7) * 24 * 60 * 60 * 1000),
       status: room.scheduleStatus || 'Active',
     });
@@ -415,89 +416,36 @@ export function generateMaintenanceEvents(coolingUnits: CoolingUnit[]): Maintena
   return events;
 }
 
-// Generate AI recommendations
-export function generateRecommendations(rooms: Room[], dampers: Damper[], coolingUnits: CoolingUnit[]): Recommendation[] {
-  const recommendations: Recommendation[] = [];
-  const now = new Date();
-  
-  // Pre-cool recommendation
-  const scheduledRoom = rooms.find(r => r.coolingStatus === 'Starting in 10 Minutes');
-  if (scheduledRoom) {
-    recommendations.push({
-      id: 'rec-precool-1',
-      title: `Pre-cool ${scheduledRoom.name} earlier`,
-      type: 'optimization',
-      affectedComponents: [{ type: 'room', id: scheduledRoom.id, name: scheduledRoom.name }],
-      estimatedImpact: '8% energy savings',
-      confidenceScore: 87,
-      generatedTime: now,
-      rationale: 'Based on occupancy patterns, starting cooling 12 minutes earlier would achieve target temperature more efficiently',
-      suggestedAction: 'Initiate pre-cooling sequence',
-    });
-  }
-  
-  // Damper rebalancing
-  const lowDamper = dampers.find(d => d.openness < 50);
-  if (lowDamper) {
-    recommendations.push({
-      id: 'rec-damper-1',
-      title: `Adjust ${lowDamper.name} for better airflow`,
-      type: 'optimization',
-      affectedComponents: [{ type: 'damper', id: lowDamper.id, name: lowDamper.name }],
-      estimatedImpact: 'Improved comfort in connected rooms',
-      confidenceScore: 92,
-      generatedTime: now,
-      rationale: 'Current damper position limiting airflow to downstream rooms',
-      suggestedAction: 'Increase damper openness by 15%',
-    });
-  }
-  
-  // Efficiency recommendation
-  const lowEffUnit = coolingUnits.find(u => u.efficiency < 85);
-  if (lowEffUnit) {
-    recommendations.push({
-      id: 'rec-eff-1',
-      title: `Inspect ${lowEffUnit.name} filter condition`,
-      type: 'maintenance',
-      affectedComponents: [{ type: 'cooling-unit', id: lowEffUnit.id, name: lowEffUnit.name }],
-      estimatedImpact: 'Potential 12% efficiency improvement',
-      confidenceScore: 78,
-      generatedTime: now,
-      rationale: 'Efficiency trend shows gradual decline over past 2 weeks',
-      suggestedAction: 'Schedule filter inspection',
-    });
-  }
-  
-  // Energy saving
-  recommendations.push({
-    id: 'rec-energy-1',
-    title: 'Shift low-priority cooling to off-peak window',
-    type: 'energy-saving',
-    affectedComponents: rooms.filter(r => r.priorityLevel === 'low').map(r => ({ type: 'room' as const, id: r.id, name: r.name })),
-    estimatedImpact: '15% reduction in peak demand',
-    confidenceScore: 85,
-    generatedTime: now,
-    rationale: 'Peak demand forecasted at 2:00 PM, pre-cooling low-priority zones before peak can reduce strain',
-    suggestedAction: 'Enable off-peak cooling schedule',
-  });
-  
-  // Comfort optimization
-  const highOccupancyRoom = rooms.find(r => r.occupancyCount > r.capacity * 0.8);
-  if (highOccupancyRoom) {
-    recommendations.push({
-      id: 'rec-comfort-1',
-      title: `Increase cooling for high-occupancy ${highOccupancyRoom.name}`,
-      type: 'comfort',
-      affectedComponents: [{ type: 'room', id: highOccupancyRoom.id, name: highOccupancyRoom.name }],
-      estimatedImpact: '+15 comfort score improvement',
-      confidenceScore: 91,
-      generatedTime: now,
-      rationale: 'Room at 90% capacity with elevated temperature',
-      suggestedAction: 'Boost damper openness and cooling intensity',
-    });
-  }
-  
-  return recommendations;
+// Generate AI recommendations — mock-fallback path only. The live path uses
+// bundleToRecommendation() in hvac-live-data.ts against real backend
+// output; this produces LiveRecommendation-shaped placeholders (isReal:
+// false, so Apply is disabled) from mock room data, so both paths render
+// through the same component without a separate branch.
+export function generateRecommendations(rooms: Room[]): LiveRecommendation[] {
+  const now = new Date().toISOString();
+  let nextId = -1;
+
+  return rooms
+    .map((room): LiveRecommendation | null => {
+      const deviation = room.currentTemp - room.targetTemp;
+      if (Math.abs(deviation) < 1) return null; // close enough to target, nothing to suggest
+
+      const action = deviation > 0 ? 'increase_airflow' : 'decrease_airflow';
+      return {
+        id: nextId--,
+        roomId: room.id,
+        zoneName: room.name,
+        action,
+        reason: `${room.name} is ${Math.abs(deviation).toFixed(1)}°C ${deviation > 0 ? 'above' : 'below'} its ${room.targetTemp}°C target — ${action === 'increase_airflow' ? 'more' : 'less'} airflow would help it converge.`,
+        estimatedEnergyChange: action === 'increase_airflow' ? rand(0.05, 0.3) : -rand(0.05, 0.2),
+        comfortImpact: action === 'increase_airflow' ? 'improves' : 'neutral',
+        status: 'pending',
+        timestamp: now,
+        isReal: false,
+      };
+    })
+    .filter((r): r is LiveRecommendation => r !== null)
+    .slice(0, 5);
 }
 
 // Calculate KPIs. `previous` carries forward fields that a live data refresh
@@ -564,7 +512,7 @@ export function generateInitialHVACState(): HVACSystemState {
   const schedules = generateSchedules(rooms);
   const issues = generateIssues(coolingUnits, dampers, rooms);
   const maintenanceEvents = generateMaintenanceEvents(coolingUnits);
-  const recommendations = generateRecommendations(rooms, dampers, coolingUnits);
+  const recommendations = generateRecommendations(rooms);
   const kpis = calculateKPIs(rooms, coolingUnits, issues);
   const utilizationHistory = generateUtilizationHistory();
   
@@ -581,6 +529,7 @@ export function generateInitialHVACState(): HVACSystemState {
     lastUpdated: new Date(),
     aiOptimizationActive: true,
     simulationRunning: false,
+    dataSource: 'mock-fallback',
   };
 }
 
