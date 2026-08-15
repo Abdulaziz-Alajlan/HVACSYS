@@ -671,18 +671,6 @@ export function PropertiesPanel() {
           </>
         )}
       </div>
-
-      {/* Position info */}
-      <div className="p-4 border-t border-border bg-secondary/30">
-        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-          <div>
-            X: {Math.round(node.position.x)}
-          </div>
-          <div>
-            Y: {Math.round(node.position.y)}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

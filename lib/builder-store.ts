@@ -493,6 +493,16 @@ export const useBuilderStore = create<BuilderState>()(
         const label = typeof node.data.label === 'string' ? node.data.label : undefined;
         const name = typeof node.data.name === 'string' ? node.data.name : undefined;
 
+        // A duplicated room must NOT keep the original's zoneId/aiRecommendation:
+        // syncZoneMapping() only ever sets these on real name matches, so a
+        // straight data spread here would leave two diagram nodes silently
+        // aliasing the same backend zone under different display names — the
+        // copy's fields would show as read-only (properties-panel disables
+        // manual edits whenever zoneId is set) and any "Optimize" click on it
+        // would hit the exact same zone the original maps to. Clearing these
+        // makes the copy start fresh and editable, exactly like a brand-new
+        // room node, until/unless it's renamed to match a different real zone.
+        const isRoom = node.data.type === 'room';
         const duplicatedNode: HVACNode = {
           ...node,
           id: generateNodeId(node.type || 'node'),
@@ -504,6 +514,7 @@ export const useBuilderStore = create<BuilderState>()(
             ...node.data,
             ...(label ? { label: `${label} Copy` } : {}),
             ...(name ? { name: `${name} Copy` } : {}),
+            ...(isRoom ? { zoneId: undefined, aiLoading: false, aiRecommendation: null } : {}),
           } as HVACNodeData,
         };
 
