@@ -78,6 +78,8 @@ export function PropertiesPanel() {
     runAIOptimize,
     applyRecommendation,
     triggerScenario,
+    zones,
+    connectRoomToZone,
   } = useBuilderStore();
   const node = nodes.find((n) => n.id === selectedNodeId);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
@@ -428,6 +430,13 @@ export function PropertiesPanel() {
           const hasZone = roomData.zoneId !== undefined;
           const rec = roomData.aiRecommendation;
           const loading = Boolean(roomData.aiLoading);
+          const usedZoneIds = new Set(
+            nodes
+              .filter((n) => n.id !== node.id && n.data.type === "room")
+              .map((n) => (n.data as RoomNodeData).zoneId)
+              .filter((id): id is number => id !== undefined)
+          );
+          const availableZones = zones.filter((z) => !usedZoneIds.has(z.id));
 
           return (
             <>
@@ -465,12 +474,34 @@ export function PropertiesPanel() {
               <Separator />
 
               {!hasZone && (
-                <p className="text-xs text-muted-foreground">
-                  No matching backend zone for &quot;{roomData.name}&quot; — editing local values
-                  only, AI Optimize and scenarios are unavailable for this node. Rename it to
-                  match a real zone name (e.g. A-101, B-201) to connect it to live AI features, or
-                  keep it as-is to use this node purely as a freeform design element.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Not connected to a room. Values above are just what you type in — connect
+                    it to unlock AI Optimize and scenarios, or leave it as a design-only element.
+                  </p>
+                  {availableZones.length > 0 ? (
+                    <Select
+                      value=""
+                      onValueChange={(zoneId) => connectRoomToZone(node.id, Number(zoneId))}
+                      disabled={loading}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder={loading ? "Connecting…" : "Select a room…"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableZones.map((zone) => (
+                          <SelectItem key={zone.id} value={String(zone.id)}>
+                            {zone.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/70">
+                      Every room is already connected to another node.
+                    </p>
+                  )}
+                </div>
               )}
 
               {hasZone && selectedNodeId && (

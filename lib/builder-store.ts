@@ -103,6 +103,10 @@ interface BuilderState {
   // so the toolbar can show a persistent signal instead of the user only
   // discovering it node-by-node via "no matching backend zone".
   zoneSyncFailed: boolean;
+  // The real backend zones, fetched once on mount by syncZoneMapping — kept
+  // here (not just used transiently) so the properties panel can offer a
+  // "connect to a room" picker instead of requiring an exact-name rename.
+  zones: ApiZone[];
 
   // Actions
   onNodesChange: (changes: NodeChange<HVACNode>[]) => void;
@@ -128,6 +132,7 @@ interface BuilderState {
   // Backend-integration actions (Day 4)
   setZoneSyncFailed: (failed: boolean) => void;
   syncZoneMapping: (zones: ApiZone[]) => Promise<void>;
+  connectRoomToZone: (nodeId: string, zoneId: number) => Promise<void>;
   runAIOptimize: (nodeId: string) => Promise<void>;
   runAIOptimizeAll: () => Promise<void>;
   applyRecommendation: (nodeId: string) => Promise<void>;
@@ -392,6 +397,64 @@ function isCurrentNodeVersion(key: string, version: number): boolean {
   return nodeFetchVersions.get(key) === version;
 }
 
+// Shared by syncZoneMapping (automatic, name-matched) and connectRoomToZone
+// (manual, user-picked from the properties panel) so both paths pull the
+// same real currentTemp/targetTemp/occupancy/comfortScore/status/issues —
+// and sync the upstream damper node the same way — instead of the two
+// entry points drifting into two slightly different "what does connecting
+// a room actually populate" implementations.
+async function fetchAndApplyZoneData(
+  get: () => BuilderState,
+  nodeId: string,
+  zone: ApiZone
+): Promise<void> {
+  const readings = await api.getZoneReadings(zone.id, 1);
+  const latest = readings[readings.length - 1];
+  if (!latest) {
+    get().updateNodeData(nodeId, { zoneId: zone.id, name: zone.name, aiLoading: false });
+    return;
+  }
+  const comfortScore = computeComfortScore(
+    latest.temperature,
+    zone.target_temperature,
+    latest.occupancy,
+    zone.capacity
+  );
+  const issues = computeIssueFlags(
+    latest.temperature,
+    zone.target_temperature,
+    latest.occupancy,
+    zone.capacity,
+    latest.airflow,
+    zone.room_type
+  );
+  get().updateNodeData(nodeId, {
+    zoneId: zone.id,
+    name: zone.name,
+    aiLoading: false,
+    roomType: zone.room_type as RoomNodeData['roomType'],
+    currentTemp: Math.round(latest.temperature * 10) / 10,
+    targetTemp: zone.target_temperature,
+    occupancy: latest.occupancy,
+    capacity: zone.capacity,
+    airflow: Math.round(latest.airflow),
+    comfortScore: Math.round(comfortScore),
+    status: deriveCoolingStatus(latest.damper_position, latest.occupancy),
+    issues,
+  });
+
+  const upstreamEdge = get().edges.find((e) => e.target === nodeId);
+  const damperNode = upstreamEdge
+    ? get().nodes.find((n) => n.id === upstreamEdge.source && n.data.type === 'damper')
+    : undefined;
+  if (damperNode) {
+    get().updateNodeData(damperNode.id, {
+      openness: Math.round(latest.damper_position),
+      airflow: Math.round(latest.airflow),
+    });
+  }
+}
+
 export const useBuilderStore = create<BuilderState>()(
   persist(
     (set, get) => ({
@@ -402,6 +465,7 @@ export const useBuilderStore = create<BuilderState>()(
       simulationActive: false,
       isSyncing: false,
       zoneSyncFailed: false,
+      zones: [],
 
       onNodesChange: (changes) => {
         set({
@@ -566,7 +630,7 @@ export const useBuilderStore = create<BuilderState>()(
         // next to an AI recommendation reasoning about the real ones. Uses
         // the same derivation formulas as the dashboard (zone-derived.ts) so
         // the two surfaces can't drift apart the way targetTemp once did.
-        set({ isSyncing: true });
+        set({ isSyncing: true, zones });
         const roomNodes = get().nodes.filter((n) => n.data.type === 'room');
         try {
           await Promise.all(
@@ -578,56 +642,7 @@ export const useBuilderStore = create<BuilderState>()(
                 return;
               }
               try {
-                const readings = await api.getZoneReadings(zone.id, 1);
-                const latest = readings[readings.length - 1];
-                if (!latest) {
-                  get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
-                  return;
-                }
-                const comfortScore = computeComfortScore(
-                  latest.temperature,
-                  zone.target_temperature,
-                  latest.occupancy,
-                  zone.capacity
-                );
-                const issues = computeIssueFlags(
-                  latest.temperature,
-                  zone.target_temperature,
-                  latest.occupancy,
-                  zone.capacity,
-                  latest.airflow,
-                  zone.room_type
-                );
-                get().updateNodeData(node.id, {
-                  zoneId: zone.id,
-                  aiLoading: false,
-                  roomType: zone.room_type as RoomNodeData['roomType'],
-                  currentTemp: Math.round(latest.temperature * 10) / 10,
-                  targetTemp: zone.target_temperature,
-                  occupancy: latest.occupancy,
-                  capacity: zone.capacity,
-                  airflow: Math.round(latest.airflow),
-                  comfortScore: Math.round(comfortScore),
-                  status: deriveCoolingStatus(latest.damper_position, latest.occupancy),
-                  issues,
-                });
-
-                // The upstream damper node otherwise keeps generateDamperData()'s
-                // random openness/airflow until the user happens to Apply a
-                // recommendation or trigger a scenario for this room (the only
-                // other places that patch it, both further down this file) — so
-                // a freshly-loaded canvas showed a fake damper reading right next
-                // to the room's now-real one. Sync it here too, same edge lookup.
-                const upstreamEdge = get().edges.find((e) => e.target === node.id);
-                const damperNode = upstreamEdge
-                  ? get().nodes.find((n) => n.id === upstreamEdge.source && n.data.type === 'damper')
-                  : undefined;
-                if (damperNode) {
-                  get().updateNodeData(damperNode.id, {
-                    openness: Math.round(latest.damper_position),
-                    airflow: Math.round(latest.airflow),
-                  });
-                }
+                await fetchAndApplyZoneData(get, node.id, zone);
               } catch (err) {
                 console.error(`Failed to sync live data for ${roomData.name}:`, err);
                 get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
@@ -636,6 +651,25 @@ export const useBuilderStore = create<BuilderState>()(
           );
         } finally {
           set({ isSyncing: false });
+        }
+      },
+
+      connectRoomToZone: async (nodeId, zoneId) => {
+        const node = get().nodes.find((n) => n.id === nodeId);
+        if (!node || node.data.type !== 'room') return;
+        const zone = get().zones.find((z) => z.id === zoneId);
+        if (!zone) {
+          toast.error('That room is no longer available');
+          return;
+        }
+        get().updateNodeData(nodeId, { aiLoading: true });
+        try {
+          await fetchAndApplyZoneData(get, nodeId, zone);
+          toast.success(`Connected to ${zone.name}`);
+        } catch (err) {
+          get().updateNodeData(nodeId, { aiLoading: false });
+          toast.error(`Failed to connect to ${zone.name}`);
+          console.error(err);
         }
       },
 
