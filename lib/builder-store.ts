@@ -261,7 +261,7 @@ const initialNodes: HVACNode[] = [
   {
     id: 'cu-2',
     type: 'coolingUnit',
-    position: { x: 100, y: 450 },
+    position: { x: 100, y: 600 },
     data: generateCoolingUnitData('CU-02'),
   },
   {
@@ -277,10 +277,30 @@ const initialNodes: HVACNode[] = [
     data: generateDamperData('D-02'),
   },
   {
-    id: 'd-3',
+    // B-201's own dedicated VAV box — it used to share D-02 with A-102,
+    // which isn't how VAV systems actually work (one damper position can't
+    // correctly serve two zones with different setpoints). Fed from CU-01,
+    // which at 63% utilization has the headroom D-02's already-busy CU-02
+    // sibling doesn't.
+    id: 'd-4',
     type: 'damper',
     position: { x: 350, y: 450 },
+    data: generateDamperData('D-04'),
+  },
+  {
+    id: 'd-3',
+    type: 'damper',
+    position: { x: 350, y: 600 },
     data: generateDamperData('D-03'),
+  },
+  {
+    // New VAV box for C-301 (Server Room) — one of the four real backend
+    // zones not on the default canvas. Also fed from CU-01 for the same
+    // headroom reason as D-04.
+    id: 'd-5',
+    type: 'damper',
+    position: { x: 350, y: 750 },
+    data: generateDamperData('D-05'),
   },
   {
     id: 'r-1',
@@ -306,6 +326,16 @@ const initialNodes: HVACNode[] = [
     position: { x: 600, y: 530 },
     data: generateRoomData('B-202'),
   },
+  {
+    // C-301's tight 18C target and constant equipment heat load make it
+    // visibly react differently to AI Optimize/scenarios than the office
+    // rooms above — matched to the real zone by name, same as the other
+    // four, so it gets live data on mount with no manual setup needed.
+    id: 'r-5',
+    type: 'room',
+    position: { x: 600, y: 680 },
+    data: generateRoomData('C-301'),
+  },
 ];
 
 const initialEdges: HVACEdge[] = [
@@ -321,6 +351,22 @@ const initialEdges: HVACEdge[] = [
     id: 'e-cu1-d2',
     source: 'cu-1',
     target: 'd-2',
+    animated: true,
+    style: { stroke: 'hsl(202 51% 53%)', strokeWidth: 2 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(202 51% 53%)' },
+  },
+  {
+    id: 'e-cu1-d4',
+    source: 'cu-1',
+    target: 'd-4',
+    animated: true,
+    style: { stroke: 'hsl(202 51% 53%)', strokeWidth: 2 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(202 51% 53%)' },
+  },
+  {
+    id: 'e-cu1-d5',
+    source: 'cu-1',
+    target: 'd-5',
     animated: true,
     style: { stroke: 'hsl(202 51% 53%)', strokeWidth: 2 },
     markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(202 51% 53%)' },
@@ -350,8 +396,8 @@ const initialEdges: HVACEdge[] = [
     markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(142 20% 57%)' },
   },
   {
-    id: 'e-d2-r3',
-    source: 'd-2',
+    id: 'e-d4-r3',
+    source: 'd-4',
     target: 'r-3',
     animated: true,
     style: { stroke: 'hsl(142 20% 57%)', strokeWidth: 2 },
@@ -361,6 +407,14 @@ const initialEdges: HVACEdge[] = [
     id: 'e-d3-r4',
     source: 'd-3',
     target: 'r-4',
+    animated: true,
+    style: { stroke: 'hsl(142 20% 57%)', strokeWidth: 2 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(142 20% 57%)' },
+  },
+  {
+    id: 'e-d5-r5',
+    source: 'd-5',
+    target: 'r-5',
     animated: true,
     style: { stroke: 'hsl(142 20% 57%)', strokeWidth: 2 },
     markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(142 20% 57%)' },
