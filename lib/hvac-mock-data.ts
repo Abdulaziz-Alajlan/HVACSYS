@@ -572,7 +572,7 @@ export function simulateUpdate(state: HVACSystemState): HVACSystemState {
   if (state.aiOptimizationActive) {
     newState.dampers = state.dampers.map(damper => ({
       ...damper,
-      openness: Math.max(10, Math.min(100, damper.openness + rand(-1, 1))),
+      openness: Math.round(Math.max(10, Math.min(100, damper.openness + rand(-1, 1))) * 100) / 100,
       lastAdjustmentTime: Math.random() > 0.9 ? new Date() : damper.lastAdjustmentTime,
     }));
   }

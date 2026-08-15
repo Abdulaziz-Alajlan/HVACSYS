@@ -206,7 +206,7 @@ export function RoomDetailDrawer({ room, open, onClose }: RoomDetailDrawerProps)
                   <Wind className="h-4 w-4 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">Damper</span>
                 </div>
-                <p className="mt-1 text-lg font-bold text-foreground">{damper?.openness ?? 0}%</p>
+                <p className="mt-1 text-lg font-bold text-foreground">{(damper?.openness ?? 0).toFixed(2)}%</p>
                 <p className="text-xs text-muted-foreground">{damper?.name}</p>
               </div>
               <div className="rounded-lg border border-border bg-card p-3">
