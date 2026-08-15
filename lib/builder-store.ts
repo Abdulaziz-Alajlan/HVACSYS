@@ -603,6 +603,16 @@ export const useBuilderStore = create<BuilderState>()(
           edges: initialEdges,
           selectedNodeId: null,
         });
+        // Without this, the reset canvas shows initialNodes' random mock
+        // values (roomType/currentTemp/etc from generateRoomData) instead
+        // of real data, and every AI/scenario control goes dark, until the
+        // user happens to reload the page -- syncZoneMapping normally only
+        // runs once on /builder's mount. Reuses whatever zones were already
+        // fetched then; if that initial fetch failed, this is a no-op, same
+        // as it already was on mount.
+        if (get().zones.length > 0) {
+          void get().syncZoneMapping(get().zones);
+        }
       },
 
       duplicateNode: (id) => {
