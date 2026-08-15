@@ -289,11 +289,12 @@ export function BuilderCanvas() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0"
+                  className="gap-2"
                   aria-label="Reset layout"
                   title="Reset layout"
                 >
                   <RotateCcw className="h-4 w-4" />
+                  Reset
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
