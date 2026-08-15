@@ -51,10 +51,12 @@ export interface RoomAIRecommendation {
   estimatedEnergyChange: number;
   comfortImpact: string | null;
   status: string;
-  // When this recommendation was generated — the panel doesn't auto-refresh,
-  // so without this a recommendation from minutes ago (against room state
-  // that's since moved on) looks identical to a fresh one, which reads as
-  // "the AI is stuck" rather than "the room changed since you last asked."
+  // When this recommendation was generated. Room state itself now
+  // background-refreshes (see syncZoneMapping's `background` polling in
+  // app/builder/page.tsx), but applying a recommendation still forces the
+  // damper to its recommendedAirflow as computed at fetchedAt — that number
+  // isn't recalculated at apply-time — so this timestamp still matters for
+  // judging whether a pending recommendation is worth re-generating.
   fetchedAt: string;
 }
 
@@ -131,7 +133,7 @@ interface BuilderState {
 
   // Backend-integration actions (Day 4)
   setZoneSyncFailed: (failed: boolean) => void;
-  syncZoneMapping: (zones: ApiZone[]) => Promise<void>;
+  syncZoneMapping: (zones: ApiZone[], options?: { background?: boolean }) => Promise<void>;
   connectRoomToZone: (nodeId: string, zoneId: number) => Promise<void>;
   runAIOptimize: (nodeId: string) => Promise<void>;
   runAIOptimizeAll: () => Promise<void>;
@@ -681,10 +683,14 @@ export const useBuilderStore = create<BuilderState>()(
 
       setZoneSyncFailed: (failed) => set({ zoneSyncFailed: failed }),
 
-      syncZoneMapping: async (zones) => {
+      syncZoneMapping: async (zones, options) => {
         // Also clears aiLoading: a request in flight when the page reloads
         // would otherwise leave a stuck spinner, since persist saves node
-        // data (including aiLoading) to localStorage.
+        // data (including aiLoading) to localStorage. Background polls skip
+        // that clear-and-refetch for any node with aiLoading already true —
+        // that means a real runAIOptimize/applyRecommendation/triggerScenario
+        // call is in flight for it right now, and a poll landing mid-request
+        // has no business overwriting whatever that call is about to set.
         //
         // Pulls each matched room's *real* currentTemp/targetTemp/occupancy/
         // airflow/comfortScore/roomType/status/issues from the backend, not
@@ -694,27 +700,30 @@ export const useBuilderStore = create<BuilderState>()(
         // next to an AI recommendation reasoning about the real ones. Uses
         // the same derivation formulas as the dashboard (zone-derived.ts) so
         // the two surfaces can't drift apart the way targetTemp once did.
-        set({ isSyncing: true, zones });
+        const background = options?.background ?? false;
+        if (!background) set({ isSyncing: true });
+        set({ zones });
         const roomNodes = get().nodes.filter((n) => n.data.type === 'room');
         try {
           await Promise.all(
             roomNodes.map(async (node) => {
               const roomData = node.data as RoomNodeData;
+              if (background && roomData.aiLoading) return;
               const zone = zones.find((z) => z.name === roomData.name);
               if (!zone) {
-                get().updateNodeData(node.id, { zoneId: undefined, aiLoading: false });
+                if (!background) get().updateNodeData(node.id, { zoneId: undefined, aiLoading: false });
                 return;
               }
               try {
                 await fetchAndApplyZoneData(get, node.id, zone);
               } catch (err) {
                 console.error(`Failed to sync live data for ${roomData.name}:`, err);
-                get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
+                if (!background) get().updateNodeData(node.id, { zoneId: zone.id, aiLoading: false });
               }
             })
           );
         } finally {
-          set({ isSyncing: false });
+          if (!background) set({ isSyncing: false });
         }
       },
 

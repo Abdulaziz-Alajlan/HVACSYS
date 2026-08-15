@@ -550,21 +550,15 @@ export function PropertiesPanel() {
                         </span>
                       </div>
                       {rec.status === "pending" && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            onClick={() => applyRecommendation(selectedNodeId)}
-                            disabled={loading}
-                          >
-                            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
-                            Apply
-                          </Button>
-                          <p className="text-[10px] text-muted-foreground">
-                            Room state doesn&apos;t auto-refresh here — if it&apos;s been a while, click AI Optimize
-                            again before applying to make sure this still reflects the current state.
-                          </p>
-                        </>
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          onClick={() => applyRecommendation(selectedNodeId)}
+                          disabled={loading}
+                        >
+                          {loading && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+                          Apply
+                        </Button>
                       )}
                     </div>
                   )}

@@ -39,16 +39,38 @@ function BuilderContent() {
   // zoneSyncFailed surfaces that in the toolbar rather than only console.error
   // — otherwise a user only discovers it node-by-node.
   useEffect(() => {
+    let cancelled = false;
+    let pollId: ReturnType<typeof setInterval> | undefined;
+
     api
       .getZones()
       .then((zones) => {
+        if (cancelled) return;
         setZoneSyncFailed(false);
-        return syncZoneMapping(zones);
+        return syncZoneMapping(zones).then(() => {
+          if (cancelled) return;
+          // Keeps zone-mapped rooms' temp/occupancy/comfort/status current
+          // in the background — without this, the properties panel's own
+          // displayed state could sit stale indefinitely between manual
+          // AI Optimize clicks, on top of (not instead of) the
+          // recommendation itself still being a point-in-time snapshot.
+          // 30s comfortably beats live_simulator.py's 5-minute tick without
+          // hammering the backend for 5 zones' worth of reading fetches.
+          pollId = setInterval(() => {
+            syncZoneMapping(useBuilderStore.getState().zones, { background: true });
+          }, 30_000);
+        });
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error('Failed to sync builder zones with backend:', err);
         setZoneSyncFailed(true);
       });
+
+    return () => {
+      cancelled = true;
+      if (pollId) clearInterval(pollId);
+    };
   }, [syncZoneMapping, setZoneSyncFailed]);
 
   const sensors = useSensors(
