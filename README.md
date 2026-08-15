@@ -5,6 +5,8 @@ model that forecasts zone temperature/energy 30 minutes ahead, an optimizer
 that recommends damper positions, and a Next.js dashboard + drag-and-drop
 system builder that both run on real backend data.
 
+**Live demo**: https://airwise-app.vercel.app
+
 ```
 Simulator (physics) --> FastAPI + SQLite --> ML prediction --> Optimizer
                               ^                                    |
@@ -162,23 +164,33 @@ with mock data.
 
 ## Deployment
 
-Backend on **Railway** (needs a persistent process + disk — Netlify's
-serverless functions can't host a long-running simulator or a durable
-SQLite file), frontend on **Netlify**. `backend/railway.json` is set up for
-this; the account-level steps below can't be scripted and need to be done
-once by whoever owns the Railway/Netlify accounts:
+Backend on **Railway** (needs a persistent process + disk — serverless
+functions can't host a long-running simulator or a durable SQLite file),
+frontend on **Vercel**: https://airwise-app.vercel.app.
+`backend/railway.json` is set up for the backend half; both halves are
+deployed from the local repo via each platform's CLI rather than a
+GitHub-App integration, since this repo's GitHub App connection isn't
+available to every collaborator's account:
 
 1. **Railway**: create a project from this repo, set the service's **root
    directory to `backend`**, and attach a **Volume** mounted at e.g. `/data`
    — without a volume, Railway's filesystem doesn't survive a redeploy, and
    the whole reason for choosing Railway over serverless was a persistent
    disk. Set `DATABASE_URL=sqlite:////data/hvac.db` and
-   `CORS_ORIGINS=<your-netlify-url>` as environment variables. The backend
+   `CORS_ORIGINS=<your-vercel-url>` as environment variables. The backend
    self-seeds on first boot against an empty database (see `_seed_if_empty()`
    in `main.py`) and never re-seeds an already-populated one, so this only
-   needs to happen once.
-2. **Netlify**: point the existing frontend site's `NEXT_PUBLIC_API_URL`
-   env var at the Railway service's public URL, then redeploy.
+   needs to happen once. Deploy/redeploy with `railway up --ci` from inside
+   `backend/`.
+2. **Vercel**: from the repo root, `vercel link` once to create/link the
+   project, set `NEXT_PUBLIC_API_URL` to the Railway service's public URL
+   (`vercel env add NEXT_PUBLIC_API_URL production`), then `vercel --prod`
+   to deploy. A `.vercelignore` excludes `backend/` so Vercel's monorepo
+   auto-detection doesn't try to treat the FastAPI service as a second app
+   to build. **Note**: a custom domain alias (like the one above) doesn't
+   automatically move to a new deployment — after every `vercel --prod`,
+   run `vercel alias set <new-deployment-url> <your-alias>` or the alias
+   keeps serving the previous build.
 3. Optionally run `python -m simulation.live_simulator` as a second Railway
    service (or a scheduled/always-on process) so the deployed demo has
    moving data instead of a static seed snapshot.
